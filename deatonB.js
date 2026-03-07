@@ -114,6 +114,9 @@ function init() {
     if (e.ctrlKey && myKey === 89) {goRedo();}
   }
 
+alert(footOfPerp([3,2,2],[0,1,0]));
+alert(13);
+
 reDo();
 
 } // end init
@@ -642,10 +645,15 @@ function getPillow(thisType,thisParamList) {
     myMat = isomSeg2Seg(myShape[4],myShape[5],myShape[3],myShape[2]);
     vert1 = multMatVect(myMat,mid1);
     vert2 = multMatVect(myMat,myShape[6]);
+//alert(["test",myShape[7],myShape[0],myShape[1],vert2,vert1,myShape[3],myShape[4],mid1]);
     myShape = [myShape[7],myShape[0],myShape[1],vert2,vert1,myShape[3],myShape[4],mid1];
-// I need to reorthogonalize the new myShape[5]&[6] so the angles are 90 degrees.
-
-
+//alert(myShape);
+    // move myShape[5] and myShape[6]
+    // Drop perpendiculars from myShape[4] and myShape[7] onto the gamma line.
+    let lineGamma = points2Line(myShape[5], myShape[6]);
+    myShape[5] = footOfPerp(myShape[4], lineGamma);
+    myShape[6] = footOfPerp(myShape[7], lineGamma);
+alert(["more",myShape[5],myShape[6]]);
   }
   return(myShape);
 } // end getPillow()
@@ -940,6 +948,11 @@ function tRef(P) {
 // reflect a point P over a line L
 function reflPtOverLine(P,L) {
   return(vectMinus(P, scalarVect(-2*hDot(P,L)/hDot(L,L),L)));
+}
+
+// drop a perpendicular from point P onto line L, returning the foot of the perpendicular
+function footOfPerp(P,L) {
+  return(hNorm(vectPlus(P, scalarVect(-hDot(P,L)/hDot(L,L), L))));
 }
 
 // usual cross product
