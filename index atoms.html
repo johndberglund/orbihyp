@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>OrbiHyper</title>
+<link rel="stylesheet" href="menu.css">
+<script src="orbiHyp atoms.js"></script>
+</head>
+
+<body onload="init()" onresize="resize()">
+<nav>
+<ul>
+  <li class="dropdown"><a>File</a>
+    <ul>
+<!--
+      <li><a onclick="init()">New</a>
+      <li><a><input type="file" name="file" id="loadDesign" 
+              class="inputfile" onchange="loadDesign()" />
+        <label for="loadDesign">Load design</label></a>
+      <li><a onclick="saveSVG()">Save SVG</a>
+-->
+      <li><a download="myImage.png" onclick="goPng(this)">Save PNG</a>
+      <li><a onclick="goSave(this)">Save data</a>
+<!--      <li><a onclick="saveDesign()">Save design</a>
+this was the div thing I used below
+<div style="float:left; margin: 4px 0 0 4px">
+-->
+    </ul>
+  </li>
+<!--
+  <li><a href="#home">Help</a></li>
+-->
+</ul>
+</nav>
+
+
+<form>
+<div>
+<input type="radio" id="sheet" name="atom" onchange="setAtom(0);"  checked>
+sheet 
+</div>
+
+<div>
+<input type="radio" id="hat" name="atom" onchange="setAtom(1);" >
+hat 
+</div>
+
+<div>
+<input type="radio" id="pillow" name="atom" onchange="setAtom(2);" >
+pillow 
+</div>
+
+</form>
+
+<div style="float:left; width:140px;">
+<form>
+<br>
+
+Orbifold:
+<input type="text" id="orbifold" value = "test" style="width: 120px" readonly></input>
+
+<p>
+Num. Sides
+<input type="number" id="numSides" value = "3" style="width: 120px" onchange="reDo()"></input>
+<br>
+Input 1
+<input type="number" id="input1" value = "7" style="width: 120px" onchange="reDo()"></input>
+<br>
+Input 2
+<input type="number" id="input2" value = "3" style="width: 120px" onchange="reDo()"></input>
+<br>
+Input 3
+<input type="number" id="input3" value = "2" style="width: 120px" onchange="reDo()"></input>
+<br>
+
+<center>
+<img src="resources/undo.png" alt="Undo" onclick="goUndo()" title="Undo"></img>
+<img src="resources/redo.png" alt="Redo" onclick="goRedo()" title="Redo"></img>
+</center>
+
+<!--
+<div style="float:left">
+<label for="edit">
+<img src="resources/arrow.png" alt="Arrow" title="edit shapes" style="border: 1px solid black"></img>
+</label>
+<br>
+<input type="radio" id="edit" name="mode" onchange="setMode(0)" value="edit">
+</div>
+-->
+
+<div style="float:left">
+<label for="pan">
+<img src="resources/pan.png" alt="hand" title="pan" style="border: 1px solid black"></img>
+</label>
+<br>
+<input type="radio" id="pan" name="mode" onchange="setMode(-1)" value="pan">
+</div>
+
+<div style="float:left">
+<label for="line">
+<img src="resources/line.png" alt="Line" title="draw lines" style="border: 1px solid black"></img>
+</label>
+<br>
+<input type="radio" id="line" name="mode" onchange="setMode(1)" value="line" checked>
+</div>
+
+<!--
+<div style="float:left">
+<label for="circle">
+<img src="resources/circle.png" alt="Circle" title="draw circles" style="border: 1px solid black"></img>
+</label>
+<br>
+<input type="radio" id="circle" name="mode" onchange="setMode(2)" value="circle">
+</div>
+-->
+
+<div>
+<label for="poly">
+<img src="resources/poly.png" alt="Polygon" title="draw polygons" style="border: 1px solid black"></img>
+</label>
+<br>
+<input type="radio" id="poly" name="mode" onchange="setMode(3)" value="poly">
+</div>
+
+<label for="ngon">Sides in polygon:</label>
+<input type="number" id="ngon" style="width: 40px" onchange="setNgon()" value="5" min="3" step="1">
+</form>
+
+<br>
+<input type="color" id="color" onchange="setColor()"><label for="color"> Color</label>
+<br>
+<input type="checkbox" id="fill" onchange="setFill()"><label for="fill">Fill</label>
+<br>
+
+<!--
+<input type="checkbox" id="snap" onchange="setSnap()"><label for="snap">Snap</label>
+<br>
+-->
+
+</div>
+
+<div id="canvasDiv" style="max-height: 300px; max-width:256px; overflow: scroll; border:3px solid red">
+<canvas id="myCanvas"  style="border:1px solid black;"
+ onclick="mouseClicked(event)" onmousemove="mouseMoved(event)" onmousedown="mousePressed(event)" onmouseup="mouseReleased(event)"> </canvas>
+</div>
+
+</body>
+
+</html>

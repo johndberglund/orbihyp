@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Orbisphere</title>
+<link rel="stylesheet" href="menu.css">
+<script src="orbiSph.js"></script>
+</head>
+
+<body onload="init()" onresize="resize()">
+<nav>
+<ul>
+  <li class="dropdown"><a>File</a>
+    <ul>
+<!--
+      <li><a onclick="init()">New</a>
+      <li><a><input type="file" name="file" id="loadDesign" 
+              class="inputfile" onchange="loadDesign()" />
+        <label for="loadDesign">Load design</label></a>
+      <li><a onclick="saveSVG()">Save SVG</a>
+-->
+      <li><a download="myImage.png" onclick="goPng(this)">Save PNG</a>
+<!--      <li><a onclick="saveDesign()">Save design</a>
+-->
+    </ul>
+  </li>
+<!--
+  <li><a href="#home">Help</a></li>
+-->
+</ul>
+</nav>
+
+
+<form>
+<div style="float:left">
+<label for="astar532">
+<img src="resources/star 532.png" alt="*532" title="*532" style="border: 1px solid black"></img>
+</label>
+<br>
+<input type="radio" id="astar532" name="orb" onchange="setOrb(1);" value="astar532">
+</div>
+
+<div style="float:left">
+<label for="a532">
+<img src="resources/532.png" alt="532" title="532" style="border: 1px solid black"></img>
+</label>
+<br>
+<input type="radio" id="a532" name="orb" onchange="setOrb(2);" value="a532">
+</div>
+
+<div style="float:left">
+<label for="astar432">
+<img src="resources/star 432.png" alt="*432" title="*432" style="border: 1px solid black"></img>
+</label>
+<br>
+<input type="radio" id="astar432" name="orb" onchange="setOrb(3)" value="astar432">
+</div>
+
+<div style="float:left">
+<label for="a432">
+<img src="resources/432.png" alt="432" title="432" style="border: 1px solid black"></img>
+</label>
+<br>
+<input type="radio" id="a432" name="orb" onchange="setOrb(4)" value="a432">
+</div>
+
+<div style="float:left">
+<label for="astar332">
+<img src="resources/star 332.png" alt="*332" title="*332" style="border: 1px solid black"></img>
+</label>
+<br>
+<input type="radio" id="astar332" name="orb" onchange="setOrb(5)" value="astar332">
+</div>
+
+<div style="float:left">
+<label for="a3star2">
+<img src="resources/3 star 2.png" alt="3*2" title="3*2" style="border: 1px solid black"></img>
+</label>
+<br>
+<input type="radio" id="a3star2" name="orb" onchange="setOrb(6)" value="a3*2">
+</div>
+
+<div style="float:left">
+<label for="a332">
+<img src="resources/332.png" alt="332" title="332" style="border: 1px solid black"></img>
+</label>
+<br>
+<input type="radio" id="a332" name="orb" onchange="setOrb(7)" value="a332">
+</div>
+
+<div style="float:left">
+<label for="astar22n">
+<img src="resources/star 22n.png" alt="*22n" title="*22n" style="border: 1px solid black"></img>
+</label>
+<br>
+<input type="radio" id="astar22n" name="orb" onchange="setOrb(8)" value="astar22n">
+</div>
+
+<div style="float:left">
+<label for="a2starn">
+<img src="resources/2 star n.png" alt="2*n" title="2*n" style="border: 1px solid black"></img>
+</label>
+<br>
+<input type="radio" id="a2starn" name="orb" onchange="setOrb(9)" value="a2*n">
+</div>
+
+<div style="float:left">
+<label for="a22n">
+<img src="resources/22n.png" alt="22n" title="22n" style="border: 1px solid black"></img>
+</label>
+<br>
+<input type="radio" id="a22n" name="orb" onchange="setOrb(10)" value="a22n">
+</div>
+
+<div style="float:left">
+<label for="anstar">
+<img src="resources/n star.png" alt="n*" title="n*" style="border: 1px solid black"></img>
+</label>
+<br>
+<input type="radio" id="anstar" name="orb" onchange="setOrb(11)" value="anstar">
+</div>
+
+<div style="float:left">
+<label for="anx">
+<img src="resources/nx.png" alt="nx" title="nx" style="border: 1px solid black"></img>
+</label>
+<br>
+<input type="radio" id="anx" name="orb" onchange="setOrb(12)" value="anx">
+</div>
+
+<div style="float:left">
+<label for="astarnn">
+<img src="resources/star nn.png" alt="*nn" title="*nn" style="border: 1px solid black"></img>
+</label>
+<br>
+<input type="radio" id="astarnn" name="orb" onchange="setOrb(13)" value="astarnn">
+</div>
+
+<div style="float:left">
+<label for="ann">
+<img src="resources/nn.png" alt="nn" title="nn" style="border: 1px solid black"></img>
+</label>
+<br>
+<input type="radio" id="ann" name="orb" onchange="setOrb(14)" value="ann" checked>
+</div>
+
+<div>
+<label for="symN">Symmetry N:</label>
+<br>
+<input type="number" id="symN" style="width: 40px" onchange="setSymN()" value="6" min="1" step="1">
+<p>
+<br>
+</div>
+
+</form>
+
+
+<div style="float:left; width:140px;">
+<form>
+<br>
+<center>
+<img src="resources/undo.png" alt="Undo" onclick="goUndo()" title="Undo"></img>
+<img src="resources/redo.png" alt="Redo" onclick="goRedo()" title="Redo"></img>
+</center>
+
+<!--
+<div style="float:left">
+<label for="edit">
+<img src="resources/arrow.png" alt="Arrow" title="edit shapes" style="border: 1px solid black"></img>
+</label>
+<br>
+<input type="radio" id="edit" name="mode" onchange="setMode(0)" value="edit">
+</div>
+-->
+
+<div>
+<label for="spin">
+<img src="resources/spin.png" alt="Arrow" title="spin sphere" style="border: 1px solid black"></img>
+</label>
+<br>
+<input type="radio" id="spin" name="mode" onchange="setMode(-1)" value="spin">
+</div>
+
+<div style="float:left">
+<label for="line">
+<img src="resources/line.png" alt="Line" title="draw lines" style="border: 1px solid black"></img>
+</label>
+<br>
+<input type="radio" id="line" name="mode" onchange="setMode(1)" value="line" checked>
+</div>
+
+<!--
+<div style="float:left">
+<label for="circle">
+<img src="resources/circle.png" alt="Circle" title="draw circles" style="border: 1px solid black"></img>
+</label>
+<br>
+<input type="radio" id="circle" name="mode" onchange="setMode(2)" value="circle">
+</div>
+-->
+
+<div>
+<label for="poly">
+<img src="resources/poly.png" alt="Polygon" title="draw polygons" style="border: 1px solid black"></img>
+</label>
+<br>
+<input type="radio" id="poly" name="mode" onchange="setMode(3)" value="poly">
+</div>
+
+<label for="ngon">Sides in polygon:</label>
+<input type="number" id="ngon" style="width: 40px" onchange="setNgon()" value="5" min="3" step="1">
+</form>
+
+<br>
+<input type="color" id="color" onchange="setColor()"><label for="color"> Color</label>
+<br>
+<input type="checkbox" id="fill" onchange="setFill()"><label for="fill">Fill</label>
+<br>
+<!--
+<input type="checkbox" id="snap" onchange="setSnap()"><label for="snap">Snap</label>
+<br>
+-->
+
+<!--
+<center>
+<img src="resources/up.png" alt="Up" onclick="goUp()"  title="Up"></img>
+</center>
+<center>
+<img src="resources/left.png" alt="Left" onclick="goLeft()" title="Left"></img>
+<img src="resources/right.png" alt="Right" onclick="goRight()" title="Right"></img>
+</center>
+<center>
+<img src="resources/down.png" alt="Down" onclick="goDown()"  title="Down"></img>
+</center>
+<center>
+<img src="resources/grow.png" alt="Grow" onclick="goGrow()" title="Grow"></img>
+<img src="resources/shrink.png" alt="Shrink" onclick="goShrink()" title="Shrink"></img>
+</center>
+<p>
+Coordinates:
+<input type="text" id="myText"></input>
+-->
+</div>
+
+<div id="canvasDiv" style="max-height: 300px; max-width:256px; overflow: scroll; border:3px solid red">
+<canvas id="myCanvas"  style="border:1px solid black;"
+ onclick="mouseClicked(event)" onmousemove="mouseMoved(event)" onmousedown="mousePressed(event)" onmouseup="mouseReleased(event)"> </canvas>
+</div>
+
+</body>
+
+</html>
