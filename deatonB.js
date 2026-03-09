@@ -11,6 +11,7 @@ let newKali = []; // note that newKali will have one less layer of [] than kali,
 let atomList = []; // each atom will look like ["pillow",7,3,-2] with the positive numbers being angles and negatives being ultraparallel 
 let newSheet = [];
 let newPillow = [];
+let maxInfJoin;
 
 // use Weierstrass coordinates: (t,x,y) with -t^2+x^2+y^2=-1 and t>0 for hyperboloid model.
 // call them WC. 
@@ -114,9 +115,6 @@ function init() {
     if (e.ctrlKey && myKey === 89) {goRedo();}
   }
 
-alert(footOfPerp([3,2,2],[0,1,0]));
-alert(13);
-
 reDo();
 
 } // end init
@@ -157,8 +155,9 @@ function reDo() {
   orbi2Atoms();
   atomList.reverse(); // so we start with the most connections.
 
-//alert(JSON.stringify(atomList));
-//alert(JSON.stringify(infArray));
+console.log(JSON.stringify([handle,crosscap,cone,kali]));
+console.log(JSON.stringify(atomList));
+console.log(JSON.stringify(infArray));
 
   let infJoins = [0];
   for (let i = 1;i<infArray.length;i++) {
@@ -186,23 +185,21 @@ function reDo() {
     } // end nextAtom loop
     
 //alert(JSON.stringify(infJoins));
-
-
 //alert(JSON.stringify([i,nextType,paramList,nextAtom]));
 //alert(JSON.stringify(infArray));
 
     nextShape = getAtom(nextType,paramList);
 
-alert(JSON.stringify(nextShape));
-alert(JSON.stringify(distNAng(nextShape)));
+console.log(JSON.stringify(nextShape));
+console.log(JSON.stringify(distNAng(nextShape)));
 
 // figure out where to place this atom.
 // it will always connect to one of the previous.
-// *** I need to make sure we never join handles in FunDom - since they must allow twist.
-// join only from rules 7,8,9.(rule 1, mirror joins might be allowed since no twists.)
+// join only from rules 7,8,9.
+// start at 1-maxInfJoin to only join inf from rules 7,8,9
 
     if (i > 0) { // move nextShape to fit with previous shapes. 
-      for (let j=1;j<infJoins.length;j++) {
+      for (let j=1-maxInfJoin;j<infJoins.length;j++) {
         if ((infJoins[j].length > 1) && (infJoins[j][1][0] === i)) {
           let currentMat = isomSeg2Seg(nextShape[infJoins[j][1][1]],nextShape[infJoins[j][1][2]],
                                        atomPtList[infJoins[j][0][0]][infJoins[j][0][2]],
@@ -223,6 +220,8 @@ alert(JSON.stringify(distNAng(nextShape)));
 //alert(JSON.stringify(nextType.substring(0,1)));
 
   } // end atomList loop
+
+alert(JSON.stringify(infJoins));
 
 
 /*
@@ -305,10 +304,11 @@ function findJoinCoords(atomType,myIndex) {
       break;
     case "P4":
     case "P5":
-      outCoords.push(3*myIndex-3);
+      outCoords.push(2*myIndex-2);
       break;
     case "P6":
-      alert("help do P6 findJoinCoords()");
+      if (myIndex < 3) outCoords.push(2*myIndex-2);
+      else outCoords.push(5);
       break;
   }
   outCoords.push(outCoords[0]+1);
@@ -447,6 +447,7 @@ function orbi2Atoms() {
 
   //alert(JSON.stringify([6,newCone,newKali,infArray,atomList]));
 
+    maxInfJoin = infCount;
     let pCaseName;
     if ((newCone.length === 1) && (newKali.length === 1)) { // just a pCase
       pCaseName = findPCase(newCone[0],newKali[0]);
@@ -500,6 +501,7 @@ function orbi2Atoms() {
 
   //alert(JSON.stringify([5,newCone,newKali,infArray,atomList]));
 
+    maxInfJoin = infCount;
     if (newCone.length === 3) { // just one pillow
       newPillow = rotList([newCone[0],newCone[1],newCone[2]]);
       atomList.push(["P"+(3+newPillow[3]),newPillow[0],newPillow[1],newPillow[2]]);
@@ -559,7 +561,7 @@ function getPCase(thisType,thisParamList) {
     myShape = solve3Ang(angle1*2,angle2/2,angle2/2);
   } else if (thisType==="C4") { // ultra * angle
 //alert("C4");
-    side1 = thisParamList[0];
+    side1 = thisParamList[0]/2;
     angle1 = Math.PI/thisParamList[1];
     myShape = solve2Ang(side1*2,angle1/2,angle1/2);
   } else if (thisType==="C5") { // angle * ultra
@@ -613,6 +615,7 @@ function getPillow(thisType,thisParamList) {
     myMat = isomSeg2Seg(myShape[2],myShape[3],myShape[2],myShape[1]);
     vert1 = multMatVect(myMat,mid1);
     myShape = [myShape[4],myShape[0],myShape[1],vert1,myShape[2],mid1];
+console.log(JSON.stringify(["P4",myShape]));
   } else if (thisType==="P5") { // two ultra parallel
     side1 = thisParamList[0]/2;
     side2 = thisParamList[1]/2;
@@ -645,15 +648,13 @@ function getPillow(thisType,thisParamList) {
     myMat = isomSeg2Seg(myShape[4],myShape[5],myShape[3],myShape[2]);
     vert1 = multMatVect(myMat,mid1);
     vert2 = multMatVect(myMat,myShape[6]);
-//alert(["test",myShape[7],myShape[0],myShape[1],vert2,vert1,myShape[3],myShape[4],mid1]);
     myShape = [myShape[7],myShape[0],myShape[1],vert2,vert1,myShape[3],myShape[4],mid1];
-//alert(myShape);
     // move myShape[5] and myShape[6]
     // Drop perpendiculars from myShape[4] and myShape[7] onto the gamma line.
     let lineGamma = points2Line(myShape[5], myShape[6]);
     myShape[5] = footOfPerp(myShape[4], lineGamma);
     myShape[6] = footOfPerp(myShape[7], lineGamma);
-alert(["more",myShape[5],myShape[6]]);
+//alert(["more",myShape[5],myShape[6]]);
   }
   return(myShape);
 } // end getPillow()
@@ -1803,6 +1804,8 @@ function mouseReleased(event) {
 } // end mouseReleased()
 
 
+// snapTo(), checkPoint(), checkLine(), MapOne() removed (Euclidean version, unused)
+/*
 function snapTo(checkX, checkY) {
   var newPoint = findCoords(TranOrigx, TranOrigy, TranAx, TranAy, TranBx, TranBy, checkX, checkY);
   movePt = [0,0];
@@ -2411,8 +2414,7 @@ function MapOne(myMap, myOrbi,x,y,z) {
   return([xOut,yOut,zOut]);
 
 } // end MapOne
-
-
+*/
 
 
 
