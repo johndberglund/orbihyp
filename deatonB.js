@@ -190,9 +190,6 @@ console.log(JSON.stringify(infArray));
 
     nextShape = getAtom(nextType,paramList);
 
-console.log(JSON.stringify(nextShape));
-console.log(JSON.stringify(distNAng(nextShape)));
-
 // figure out where to place this atom.
 // it will always connect to one of the previous.
 // join only from rules 7,8,9.
@@ -212,6 +209,8 @@ console.log(JSON.stringify(distNAng(nextShape)));
       } // end j loop
     } // end if i > 0
 
+console.log(JSON.stringify(nextShape));
+console.log(JSON.stringify(distNAng(nextShape)));
 
     atomPtList.push(nextShape);
 
@@ -221,7 +220,7 @@ console.log(JSON.stringify(distNAng(nextShape)));
 
   } // end atomList loop
 
-alert(JSON.stringify(infJoins));
+console.log(JSON.stringify(infJoins));
 
 
 /*
@@ -377,14 +376,6 @@ function getAtom(thisType,thisParamList) {
 // We will have a length for all such infinities and sometimes a twist.
 // It sets atomList and infArray
 function orbi2Atoms() {
-//  alert(JSON.stringify([handle, crosscap, cone, kali]));
-  for (let i = 0; i<crosscap; i++) { // step 2: remove crosscap. 
-    infCount--;
-    newCone.push(infCount);
-    infArray.push([2,2]); // step 2, length 2
-  }
-
-  //alert(JSON.stringify([2,newCone,newKali,infArray,atomList]));
 
   for (let i = 0; i<handle; i++) { // step 3: remove handle.
     infCount--;
@@ -394,6 +385,15 @@ function orbi2Atoms() {
   }
 
   //alert(JSON.stringify([3,newCone,newKali,infArray,atomList]));
+
+//  alert(JSON.stringify([handle, crosscap, cone, kali]));
+  for (let i = 0; i<crosscap; i++) { // step 2: remove crosscap. 
+    infCount--;
+    newCone.push(infCount);
+    infArray.push([2,2]); // step 2, length 2
+  }
+
+  //alert(JSON.stringify([2,newCone,newKali,infArray,atomList]));
 
   if (kali.length > 0) { // here there are kaleidoscopes
     for (let i=0; i< kali.length; i++) { // ensure "2" corners adjacent if possible.
@@ -490,7 +490,7 @@ function orbi2Atoms() {
 //  alert(JSON.stringify([9,newCone,newKali,infArray,atomList]));
 
   } else { // here: no kaleidoscopes.
-    newCone = newCone.sort(function(a, b){return a-b});
+    newCone = newCone.sort(function(a, b){return b-a});
     for (let i=0; i<newCone.length-1; i++) {  // step 5. two "2" cones
       if ((newCone[i] === 2) && (newCone[i+1] === 2)) {
         infCount--;
@@ -499,7 +499,17 @@ function orbi2Atoms() {
       } 
     } // end step 5
 
-  //alert(JSON.stringify([5,newCone,newKali,infArray,atomList]));
+    newCone = newCone.sort(function(a, b){return b-a}); //may not need
+    for (let i=0;i<newCone.length;i++) {
+      if (newCone[i]<0) { // rotate array to start with handles if they exist.
+       let firstPart = newCone.slice(i);
+       let secondPart = newCone.slice(0, i);
+       newCone = [...firstPart, ...secondPart];
+       i=newCone.length;
+      }
+    }
+
+  alert(JSON.stringify([5,newCone,newKali,infArray,atomList]));
 
     maxInfJoin = infCount;
     if (newCone.length === 3) { // just one pillow
