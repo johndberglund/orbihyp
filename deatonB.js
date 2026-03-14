@@ -180,7 +180,6 @@ console.log(JSON.stringify(infArray));
 // need more params if twist? No, cause we're just doing shape. Twist will affect joins.
         let joinCoords = findJoinCoords(nextType,j);
         infJoins[-nextAtom[j]].push([i,joinCoords[0],joinCoords[1]]);
-//  alert([nextAtom[j],infArray[-nextAtom[j]],infArray]);
       }
     } // end nextAtom loop
     
@@ -190,10 +189,11 @@ console.log(JSON.stringify(infArray));
 
     nextShape = getAtom(nextType,paramList);
 
-// figure out where to place this atom.
+// where to place this atom?
 // it will always connect to one of the previous.
 // join only from rules 7,8,9.
 // start at 1-maxInfJoin to only join inf from rules 7,8,9
+// *** need to add twist for rule 8.
 
     if (i > 0) { // move nextShape to fit with previous shapes. 
       for (let j=1-maxInfJoin;j<infJoins.length;j++) {
@@ -213,24 +213,127 @@ console.log(JSON.stringify(nextShape));
 console.log(JSON.stringify(distNAng(nextShape)));
 
     atomPtList.push(nextShape);
-
-//funDom.push(...nextShape);
-//funDom.push(...[nextShape[0],nextShape[1],nextShape[2]]);
-//alert(JSON.stringify(nextType.substring(0,1)));
-
   } // end atomList loop
 
 console.log(JSON.stringify(infJoins));
+console.log("*");
+console.log(JSON.stringify(atomPtList));
+
+// here trace around the atoms to find funDom.
+
+  let currentAtom = 0;
+  let currentVert = 0;
+  let vertList = [];
+
+  let maxIter = 10000;
+  for (let iter = 0; iter < maxIter; iter++) {
+    let nVerts = atomPtList[currentAtom].length;
+    let nextVert = (currentVert + 1) % nVerts;
+
+    // Choice A: does edge (currentVert, nextVert) connect to another atom?
+    let foundJoin = false;
+    for (let j = 1 - maxInfJoin; j < infJoins.length; j++) {
+      if (infJoins[j].length < 2) continue;
+      for (let matchIdx = 0; matchIdx <= 1; matchIdx++) {
+        if (infJoins[j][matchIdx][0] === currentAtom &&
+            infJoins[j][matchIdx][1] === currentVert &&
+            infJoins[j][matchIdx][2] === nextVert) {
+          let otherIdx = 1 - matchIdx;
+          currentAtom = infJoins[j][otherIdx][0];
+          currentVert = infJoins[j][otherIdx][2]; // vertex coinciding with currentVert
+          foundJoin = true;
+          break;
+        }
+      }
+      if (foundJoin) break;
+    }
+
+    if (!foundJoin) {
+      // Choice A: No — advance along boundary
+      vertList.push([currentAtom, currentVert]);
+      currentVert = nextVert;
+    }
+
+    // Choice B: back at [0,0]?
+    if (currentAtom === 0 && currentVert === 0) {
+      break;
+    }
+  }
+
+  funDom = vertList.map(([atom, vert]) => atomPtList[atom][vert]);
+  funDomMoreVert = polyMoreVert(funDom);
+  funDomCent = hNorm(avePts(funDom));
+
 
 
 /*
-//alert("*");
-//alert(JSON.stringify(atomPtList));
+// edit this to find all isometries of all edges of each atom.
+// If they move the center too near to a previous center, don't count this isometry.
+//
+ let genLeng = genMats.length;
+  matList = [];
+  centList = [];
+  if (tileMethod === 1) { // all within some radius
+    matList.push([
+      [1,0,0],
+      [0,1,0],
+      [0,0,1]
+    ]);
+    centList.push(funDomCent);
+    let matIndex = 0;
+    let matMax = matList.length;
+    while (matIndex <= matMax) {
+      for (let i = 0;i<genLeng;i++) {
+        let newMat = multMatMat(genMats[i],matList[matIndex]);
+        let newCent = multMatVect(newMat,funDomCent);
+        if (newCent[0] < maxT) {
+          let isNew = 1;
+          for (let j=0;j<matMax;j++) {
+            let thisDist = hDist(centList[j],newCent);
+            if (thisDist < 0.001) {
+              isNew = 0;
+            } // end if
+          } // end j loop
+          if (isNew === 1) {
+            centList.push(newCent);
+            matList.push(newMat);
+            matMax++;
+          } // end if
+        } // end in bounds
+      } // end i loop
+      matIndex++;
+    } // end while loop
+
+*/
+
+
+
+
+
+
+
+
+
+
+genMats = [
+    [1,0,0],
+    [0,1,0],
+    [0,0,1]
+  ];
+
+  tileIt();
+  draw();
+
+
+
+//console.log(funDom);
+
+/*
+
 
   funDom = [atomPtList[2][3],atomPtList[2][4],atomPtList[2][0],
             atomPtList[1][2],atomPtList[1][3],atomPtList[0][4]];
 //alert(JSON.stringify(funDom));
-
 
   funDomMoreVert = polyMoreVert(funDom);
   funDomCent = hNorm(avePts(funDom));
@@ -250,11 +353,9 @@ console.log(JSON.stringify(infJoins));
 //alert(JSON.stringify(genMats));
 
   tileIt();
-
+  draw();
 */
 
-
-  draw();
 
 
 
@@ -625,7 +726,6 @@ function getPillow(thisType,thisParamList) {
     myMat = isomSeg2Seg(myShape[2],myShape[3],myShape[2],myShape[1]);
     vert1 = multMatVect(myMat,mid1);
     myShape = [myShape[4],myShape[0],myShape[1],vert1,myShape[2],mid1];
-console.log(JSON.stringify(["P4",myShape]));
   } else if (thisType==="P5") { // two ultra parallel
     side1 = thisParamList[0]/2;
     side2 = thisParamList[1]/2;
@@ -661,10 +761,9 @@ console.log(JSON.stringify(["P4",myShape]));
     myShape = [myShape[7],myShape[0],myShape[1],vert2,vert1,myShape[3],myShape[4],mid1];
     // move myShape[5] and myShape[6]
     // Drop perpendiculars from myShape[4] and myShape[7] onto the gamma line.
-    let lineGamma = points2Line(myShape[5], myShape[6]);
-    myShape[5] = footOfPerp(myShape[4], lineGamma);
-    myShape[6] = footOfPerp(myShape[7], lineGamma);
-//alert(["more",myShape[5],myShape[6]]);
+    let myLine = points2Line(myShape[5], myShape[6]);
+    myShape[5] = footOfPerp(myShape[4], myLine);
+    myShape[6] = footOfPerp(myShape[7], myLine);
   }
   return(myShape);
 } // end getPillow()
@@ -718,7 +817,6 @@ function tileIt() {
     centList.push(funDomCent);
     let matIndex = 0;
     let matMax = matList.length;
-//alert("mid tileIt");
     while (matIndex <= matMax) {
       for (let i = 0;i<genLeng;i++) {
         let newMat = multMatMat(genMats[i],matList[matIndex]);
@@ -2608,7 +2706,7 @@ function draw() {
 //alert(JSON.stringify(funDom));
 
 
-
+/*
 for (let i = 0;i<atomPtList.length;i++) {
   let fdNow = atomPtList[i];
   let fdNowMore = polyMoreVert(fdNow);
@@ -2625,10 +2723,10 @@ for (let i = 0;i<atomPtList.length;i++) {
   context.stroke();
   context.closePath();
 }
-
+*/
 
   
-/*
+
   // draw fundamental domains
   let moreVertices = funDomMoreVert;
   for (let i = 0;i<polyLeng;i++) { // loop through matrices
@@ -2666,7 +2764,7 @@ for (let i = 0;i<atomPtList.length;i++) {
     context.fill();
     context.closePath();
   } // end i loop of matrices
-*/
+
 
 
   // draw saved shapes
