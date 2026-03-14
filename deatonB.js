@@ -12,6 +12,11 @@ let atomList = []; // each atom will look like ["pillow",7,3,-2] with the positi
 let newSheet = [];
 let newPillow = [];
 let maxInfJoin;
+let FDVerts = []; // elements will look like [atom#, atomVert#, FDMapVert, isDirect]
+// Do the first two in the first pass then add then following. I may want to save the coordinates here?
+let paramSegs = []; // The first element is 0. Other elements are 
+// [startAtom#, startAtomVert#, endAtom#, endAtomVert#, twist] Note that twist = -1 if no twist. twist is in [0,1)
+// if twist exists.
 
 // use Weierstrass coordinates: (t,x,y) with -t^2+x^2+y^2=-1 and t>0 for hyperboloid model.
 // call them WC. 
@@ -465,7 +470,15 @@ function getAtom(thisType,thisParamList) {
 //alert(thisShape);
   }
   return(thisShape);
-} 
+} // end getAtom()
+
+function changeParams() {
+// We will do this by moving a paramSeg[] endpoint. 
+//Or by moving the twist parameter along the segment between the endpoints.
+	// method: store the coordinates of the segments and twist points in the base fundamental domain coordinate system. 
+	//Refind all origin atoms. Reglue to make the origin F.D. Refind the paramSegs[]. Map the coordinates of the new paramSegs{}
+	// to the saved coordinaters, including direct or flipped.
+}
 
 
 
