@@ -12,8 +12,10 @@ let atomList = []; // each atom will look like ["pillow",7,3,-2] with the positi
 let newSheet = [];
 let newPillow = [];
 let maxInfJoin;
+
 let FDVerts = []; // elements will look like [atom#, atomVert#, FDMapVert, isDirect]
 // Do the first two in the first pass then add then following. I may want to save the coordinates here?
+
 let paramSegs = []; // The first element is 0. Other elements are 
 // [startAtom#, startAtomVert#, endAtom#, endAtomVert#, twist] Note that twist = -1 if no twist. twist is in [0,1)
 // if twist exists.
@@ -271,6 +273,7 @@ console.log(JSON.stringify(atomPtList));
 
 
 
+
 /*
 // edit this to find all isometries of all edges of each atom.
 // If they move the center too near to a previous center, don't count this isometry.
@@ -310,13 +313,6 @@ console.log(JSON.stringify(atomPtList));
     } // end while loop
 
 */
-
-
-
-
-
-
-
 
 
 
@@ -409,16 +405,122 @@ function findJoinCoords(atomType,myIndex) {
       break;
     case "P4":
     case "P5":
-      outCoords.push(2*myIndex-2);
-      break;
     case "P6":
-      if (myIndex < 3) outCoords.push(2*myIndex-2);
-      else outCoords.push(5);
+      outCoords.push(3*(myIndex-1));
       break;
   }
   outCoords.push(outCoords[0]+1);
   return(outCoords);
 } // end findJoinCoords()
+
+
+// atomEdge(atomType, vertNum):
+// Given an edge of an atom — from vertNum to (vertNum+1) mod nVerts —
+// return [mappedVertNum, isDirect] for edges that map to another edge of the same atom,
+// or -1 for boundary edges (whose gluing is determined by the orbifold rules).
+// Reflection edges map to themselves with isDirect = false.
+function atomEdge(atomType, vertNum) {
+  switch(atomType) {
+    case "S3":
+      // All three edges are reflections
+      return [vertNum, false];
+    case "S4":
+      // Edge 0 (0→1): boundary; edges 1 (1→2), 2 (2→3), 3 (3→0): reflections
+      if (vertNum === 0) return -1;
+      return [vertNum, false];
+    case "S5":
+      // Edges 0 (0→1), 2 (2→3): boundary; edges 1 (1→2), 3 (3→4), 4 (4→0): reflections
+      if (vertNum === 0 || vertNum === 2) return -1;
+      return [vertNum, false];
+    case "S6":
+      // Edges 0 (0→1), 2 (2→3), 4 (4→5): boundary; edges 1 (1→2), 3 (3→4), 5 (5→0): reflections
+      if (vertNum === 0 || vertNum === 2 || vertNum === 4) return -1;
+      return [vertNum, false];
+    case "C3":
+      // Edge 0 (0→1) and edge 2 (2→0) identify via isomSeg2Seg(v0,v1,v0,v2); edge 1 (1→2) is a reflection.
+      // C3 never joins other atoms.
+      if (vertNum === 0) return [2, true];
+      if (vertNum === 1) return [1, false]; // reflection: isomSeg2SegFlip(v1,v2,v1,v2)
+      if (vertNum === 2) return [0, true];
+      break;
+    case "C4":
+      // Edge 2 (2→3) and edge 0 (0→1) identify via isomSeg2Seg(v2,v3,v1,v0);
+      // edge 3 (3→0) is a reflection; edge 1 (1→2) is a crosscap boundary.
+      // C4 never joins other atoms.
+      if (vertNum === 0) return [2, true];
+      if (vertNum === 1) return -1; // crosscap boundary
+      if (vertNum === 2) return [0, true];
+      if (vertNum === 3) return [3, false]; // reflection: isomSeg2SegFlip(v3,v0,v3,v0)
+      break;
+    case "C5":
+      // Edge 4 (4→0) and edge 3 (3→4) identify via isomSeg2Seg(v4,v0,v4,v3);
+      // edges 0 (0→1) and 2 (2→3) are reflections; edge 1 (1→2) is a boundary.
+      if (vertNum === 0) return [0, false]; // reflection: isomSeg2SegFlip(v0,v1,v0,v1)
+      if (vertNum === 1) return -1; // boundary
+      if (vertNum === 2) return [2, false]; // reflection: isomSeg2SegFlip(v2,v3,v2,v3)
+      if (vertNum === 3) return [4, true];
+      if (vertNum === 4) return [3, true];
+      break;
+    case "C6":
+      // Edge 5 (5→0) and edge 3 (3→4) identify via isomSeg2Seg(v5,v0,v4,v3);
+      // edges 0 (0→1) and 2 (2→3) are reflections; edges 1 (1→2) and 4 (4→5) are boundaries.
+      if (vertNum === 0) return [0, false]; // reflection: isomSeg2SegFlip(v0,v1,v0,v1)
+      if (vertNum === 1) return -1; // boundary
+      if (vertNum === 2) return [2, false]; // reflection: isomSeg2SegFlip(v2,v3,v2,v3)
+      if (vertNum === 3) return [5, true];
+      if (vertNum === 4) return -1; // boundary
+      if (vertNum === 5) return [3, true];
+      break;
+    case "P3":
+      // Insert mid1=midPoint(v0,v1) between v0 and v1 → 6 verts: 0=v0,1=mid1,2=v1,3=v2,4=v3,5=v4
+      // All edges pair via isomSeg2Seg; no boundary or reflection edges.
+      if (vertNum === 0) return [5, true];
+      if (vertNum === 1) return [2, true];
+      if (vertNum === 2) return [1, true];
+      if (vertNum === 3) return [4, true];
+      if (vertNum === 4) return [3, true];
+      if (vertNum === 5) return [0, true];
+      break;
+    case "P4":
+      // Insert mid1=midPoint(v1,v2) between v1 and v2 → 7 verts: 0=v0,1=v1,2=mid1,3=v2,4=v3,5=v4,6=v5
+      // Edge 0 (v0→v1) is a boundary edge.
+      if (vertNum === 0) return -1; // boundary
+      if (vertNum === 1) return [6, true];
+      if (vertNum === 2) return [3, true];
+      if (vertNum === 3) return [2, true];
+      if (vertNum === 4) return [5, true];
+      if (vertNum === 5) return [4, true];
+      if (vertNum === 6) return [1, true];
+      break;
+    case "P5":
+      // Insert mid1=midPoint(v1,v2) between v1 and v2 → 8 verts: 0=v0,1=v1,2=mid1,3=v2,4=v3,5=v4,6=v5,7=v6
+      // Edges 0 (v0→v1) and 3 (v2→v3) are boundary edges.
+      if (vertNum === 0) return -1; // boundary
+      if (vertNum === 1) return [7, true];
+      if (vertNum === 2) return [4, true];
+      if (vertNum === 3) return -1; // boundary
+      if (vertNum === 4) return [2, true];
+      if (vertNum === 5) return [6, true];
+      if (vertNum === 6) return [5, true];
+      if (vertNum === 7) return [1, true];
+      break;
+    case "P6":
+      // Insert mid1=midPoint(v1,v2) between v1 and v2 → 9 verts: 0=v0,1=v1,2=mid1,3=v2,4=v3,5=v4,6=v5,7=v6,8=v7
+      // Edges 0 (v0→v1), 3 (v2→v3), and 6 (v5→v6) are boundary edges.
+      if (vertNum === 0) return -1; // boundary
+      if (vertNum === 1) return [8, true];
+      if (vertNum === 2) return [4, true];
+      if (vertNum === 3) return -1; // boundary
+      if (vertNum === 4) return [2, true];
+      if (vertNum === 5) return [7, true];
+      if (vertNum === 6) return -1; // boundary
+      if (vertNum === 7) return [5, true];
+      if (vertNum === 8) return [1, true];
+      break;
+    default:
+      return -1;
+  }
+} // end atomEdge()
 
 
 function distNAng(shape) {
@@ -478,7 +580,7 @@ function changeParams() {
 	// method: store the coordinates of the segments and twist points in the base fundamental domain coordinate system. 
 	//Refind all origin atoms. Reglue to make the origin F.D. Refind the paramSegs[]. Map the coordinates of the new paramSegs{}
 	// to the saved coordinaters, including direct or flipped.
-}
+} // end changeParams()
 
 
 
@@ -724,6 +826,8 @@ function getPillow(thisType,thisParamList) {
     myMat = isomSeg2Seg(myShape[2],myShape[3],myShape[2],myShape[1]);
     vert1 = multMatVect(myMat,mid1);
     myShape = [myShape[0],myShape[1],vert1,myShape[2],mid1];
+    mid1 = midPoint(myShape[0],myShape[1]);
+    myShape = [myShape[0],mid1,myShape[1],myShape[2],myShape[3],myShape[4]];
   } else if (thisType==="P4") { // one ultra parallel
     side1 = thisParamList[0]/2;
     angle2 = Math.PI/thisParamList[1];
@@ -739,6 +843,8 @@ function getPillow(thisType,thisParamList) {
     myMat = isomSeg2Seg(myShape[2],myShape[3],myShape[2],myShape[1]);
     vert1 = multMatVect(myMat,mid1);
     myShape = [myShape[4],myShape[0],myShape[1],vert1,myShape[2],mid1];
+    mid1 = midPoint(myShape[1],myShape[2]);
+    myShape = [myShape[0],myShape[1],mid1,myShape[2],myShape[3],myShape[4],myShape[5]];
   } else if (thisType==="P5") { // two ultra parallel
     side1 = thisParamList[0]/2;
     side2 = thisParamList[1]/2;
@@ -756,6 +862,8 @@ function getPillow(thisType,thisParamList) {
     vert1 = multMatVect(myMat,mid1);
     vert2 = multMatVect(myMat,myShape[5]);
     myShape = [myShape[6],myShape[0],myShape[1],vert2,vert1,myShape[3],mid1];
+    mid1 = midPoint(myShape[1],myShape[2]);
+    myShape = [myShape[0],myShape[1],mid1,myShape[2],myShape[3],myShape[4],myShape[5],myShape[6]];
   } else  { // three ultra parallel (P6)
     side1 = thisParamList[0]/2;
     side2 = thisParamList[1]/2;
@@ -777,6 +885,8 @@ function getPillow(thisType,thisParamList) {
     let myLine = points2Line(myShape[5], myShape[6]);
     myShape[5] = footOfPerp(myShape[4], myLine);
     myShape[6] = footOfPerp(myShape[7], myLine);
+    mid1 = midPoint(myShape[1],myShape[2]);
+    myShape = [myShape[0],myShape[1],mid1,myShape[2],myShape[3],myShape[4],myShape[5],myShape[6],myShape[7]];
   }
   return(myShape);
 } // end getPillow()
