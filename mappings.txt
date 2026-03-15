@@ -1,0 +1,140 @@
+For s3, it will only be reflections on all three sides.
+
+for s4, we have reflections on sides 1-2 and 2-3 and 3-0. Side 0-1 will join with whichever boundary matches it, with the mapping dictated by the step used to get there. Let's call those type edges boundary edges.
+
+For s5, we have reflections on sides 4-0 and 3-4 and 1-2. Sides 0-1 and 2-3 will be boundary edges.
+
+For s6, we have reflections on sides 5-0 and 1-2 and 3-4. We have boundary edges on sides 0-1 and 2-3 and 4-5.
+
+For C3, we have mapping of 0-1 to 0-2 by isomSeg2seg(). We have a reflection on side 1-2. This atom will never join with others.
+
+For c4, we have mapping of 2-3 to 1-0 by isomSeg2Seg(). We have a reflection on side 0-3. Side 1-2 is a boundary side that will map to itself, always by a crosscap. That would mean that we would find the midpoint of side 1-2, lets call that mid1. then we map 1-mid1 to mid1-2 by isomSeg2SegFlip(). This atom will never join to others. It will only occur for orbifold with one crosscap and one cone point.
+
+For c5, map 4-0 to 4-3 by isomSeg2Seg(). Sides 1-2 is a boundary edge. Sides 0-1 and 2-3 are reflections.
+
+For c6, map 5-0 to 4-3 by isomSeg2Seg(). Sides 1-2 and 4-5 are boundary edges. Sides 0-1 and 2-3 are reflections.
+
+For P3, let mid1 be the midpoint of 0-1. We have mappings of 0-mid1 to 0-4 by isomSeg2Seg(). We map 1-mid1 to 1-2 by isomSeg2Seg(). We map 3-2 to 3-4 by isomSeg2Seg().
+
+For P4, let mid1 be the midpoint of 1-2. We have mappings of 1-mid1 to 0-5 by isomSeg2Seg(). We map 2-mid1 to 2-3 by isomSeg2Seg(). We map 4-3 to 4-5 by isomSeg2Seg(). Side 0-1 is a boundary edge.
+
+For P5, let mid1 be the midpoint of 1-2. We have mappings of 1-mid1 to 0-6 by isomSeg2Seg(). We map 2-mid1 to 3-4 by isomSeg2Seg(). We map 5-4 to 5-6 by isomSeg2Seg(). Sides 0-1 and 2-3 are a boundary edges.
+
+For P6, let mid1 be the midpoint of 1-2. We have mappings of 1-mid1 to 0-7 by isomSeg2Seg(). We map 2-mid1 to 3-4 by isomSeg2Seg(). We map 5-4 to 6-7 by isomSeg2Seg(). Sides 0-1 and 2-3 and 5-6 are a boundary edges.
+********************************
+claude:
+  deatonB.js (~2774 lines) — key issues I notice:
+
+  - Line 224: alert(JSON.stringify(infJoins)) fires on every reDo() call (every orbifold change)
+  - Lines 2584–2585: event.clientX/Y accessed inside draw() outside any event handler — will crash when draw()
+  is called without a mouse event
+  - txtToFile is defined twice (lines 1399 and 2544)
+  - goSave (line 2555) saves centList/matList, but those are empty since tiling is commented out — it would
+  save []
+  - Large MapOne() / snapTo() sections (~900 lines) are leftover from the Euclidean version and unused in the
+  current flow
+******************************
+
+I'd like to work on function reDo(). I have it able to create atoms and move them into position to make a
+fundamental domain. I need to trace around the edge of this joined shape - connecting the vertices until I
+have gone around completely. I have to figure out when to stop tracing one atom and move to the adjacent one.
+That is step 1. Then I have to find the generating matrices for each mapping from edge to edge of this funDom.
+ Here are the mappings for each atom type:
+
+Note below that I am using isomSeg2SegFlip(v0,v1,v0,v1) instead of hReflMat(points2Line(v0,v1)) although they both are the same reflections.
+Note that I'm using v0, v1 etc to stand for which vertex it is in the array of points.
+
+So generators are:
+For S3:
+isomSeg2SegFlip(v0,v1,v0,v1)
+isomSeg2SegFlip(v1,v2,v1,v2)
+isomSeg2SegFlip(v2,v0,v2,v0)
+
+For S4:
+(v0,v1) is boundary edge
+isomSeg2SegFlip(v1,v2,v1,v2)
+isomSeg2SegFlip(v2,v3,v2,v3)
+isomSeg2SegFlip(v3,v0,v3,v0)
+
+For S5:
+(v0,v1) is boundary edge
+isomSeg2SegFlip(v1,v2,v1,v2)
+(v2,v3) is boundary edge
+isomSeg2SegFlip(v3,v4,v3,v4)
+isomSeg2SegFlip(v4,v0,v4,v0)
+
+For S6:
+(v0,v1) is boundary edge
+isomSeg2SegFlip(v1,v2,v1,v2)
+(v2,v3) is boundary edge
+isomSeg2SegFlip(v3,v4,v3,v4)
+(v4,v5) is boundary edge
+isomSeg2SegFlip(v5,v0,v5,v0)
+
+For C3:
+isomSeg2Seg(v0,v1,v0,v2)
+isomSeg2Seg(v0,v2,v0,v1)
+isomSeg2SegFlip(v1,v2,v1,v2)
+
+For C4:
+isomSeg2Seg(v2,v3,v1,v0)
+isomSeg2Seg(v1,v0,v2,v3)
+isomSeg2SegFlip(v3,v0,v3,v0)
+(v1,v2) is boundary edge
+
+For C5:
+isomSeg2Seg(v4,v0,v4,v3)
+isomSeg2Seg(v4,v3,v4,v0)
+isomSeg2SegFlip(v0,v1,v0,v1)
+(v1,v2) is boundary edge
+isomSeg2SegFlip(v2,v3,v2,v3)
+
+For C6:
+isomSeg2Seg(v5,v0,v4,v3)
+isomSeg2Seg(v4,v3,v5,v0)
+isomSeg2SegFlip(v0,v1,v0,v1)
+(v1,v2) is boundary edge
+isomSeg2SegFlip(v2,v3,v2,v3)
+(v4,v5) is boundary edge
+
+For P3:
+let mid1 = midPoint(v0,v1)
+isomSeg2Seg(v0,mid1,v0,v4)
+isomSeg2Seg(v0,v4,v0,mid1)
+isomSeg2Seg(v1,mid1,v1,v2)
+isomSeg2Seg(v1,v2,v1,mid1)
+isomSeg2Seg(v3,v2,v3,v4)
+isomSeg2Seg(v3,v4,v3,v2)
+
+For P4:
+let mid1 = midPoint(v1,v2)
+isomSeg2Seg(v1,mid1,v0,v5)
+isomSeg2Seg(v0,v5,v1,mid1)
+(v0,v1) is boundary edge
+isomSeg2Seg(v2,mid1,v2,v3)
+isomSeg2Seg(v2,v3,v2,mid1)
+isomSeg2Seg(v4,v3,v4,v5)
+isomSeg2Seg(v4,v5,v4,v3)
+
+For P5:
+let mid1 = midPoint(v1,v2)
+isomSeg2Seg(v1,mid1,v0,v6)
+isomSeg2Seg(v0,v6,v1,mid1)
+(v0,v1) is boundary edge
+isomSeg2Seg(v2,mid1,v3,v4)
+isomSeg2Seg(v3,v4,v2,mid1)
+(v2,v3) is boundary edge
+isomSeg2Seg(v5,v4,v5,v6)
+isomSeg2Seg(v5,v6,v5,v4)
+
+For P5:
+let mid1 = midPoint(v1,v2)
+isomSeg2Seg(v1,mid1,v0,v7)
+isomSeg2Seg(v0,v7,v1,mid1)
+(v0,v1) is boundary edge
+isomSeg2Seg(v2,mid1,v3,v4)
+isomSeg2Seg(v3,v4,v2,mid1)
+(v2,v3) is boundary edge
+isomSeg2Seg(v5,v4,v6,v7)
+isomSeg2Seg(v6,v7,v5,v4)
+(v5,v6) is boundary edge
