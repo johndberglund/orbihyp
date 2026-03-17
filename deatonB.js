@@ -417,7 +417,7 @@ function findJoinCoords(atomType,myIndex) {
 // atomEdge(atomType, vertNum):
 // Given an edge of an atom — from vertNum to (vertNum+1) mod nVerts —
 // return [mappedVertNum, isDirect] for edges that map to another edge of the same atom,
-// or -1 for boundary edges (whose gluing is determined by the orbifold rules).
+// or -1 for step edges (whose gluing is determined by the orbifold rules).
 // Reflection edges map to themselves with isDirect = false.
 function atomEdge(atomType, vertNum) {
   switch(atomType) {
@@ -425,15 +425,15 @@ function atomEdge(atomType, vertNum) {
       // All three edges are reflections
       return [vertNum, false];
     case "S4":
-      // Edge 0 (0→1): boundary; edges 1 (1→2), 2 (2→3), 3 (3→0): reflections
+      // Edge 0 (0→1): step edge; edges 1 (1→2), 2 (2→3), 3 (3→0): reflections
       if (vertNum === 0) return -1;
       return [vertNum, false];
     case "S5":
-      // Edges 0 (0→1), 2 (2→3): boundary; edges 1 (1→2), 3 (3→4), 4 (4→0): reflections
+      // Edges 0 (0→1), 2 (2→3): step edge; edges 1 (1→2), 3 (3→4), 4 (4→0): reflections
       if (vertNum === 0 || vertNum === 2) return -1;
       return [vertNum, false];
     case "S6":
-      // Edges 0 (0→1), 2 (2→3), 4 (4→5): boundary; edges 1 (1→2), 3 (3→4), 5 (5→0): reflections
+      // Edges 0 (0→1), 2 (2→3), 4 (4→5): step edge; edges 1 (1→2), 3 (3→4), 5 (5→0): reflections
       if (vertNum === 0 || vertNum === 2 || vertNum === 4) return -1;
       return [vertNum, false];
     case "C3":
@@ -445,18 +445,18 @@ function atomEdge(atomType, vertNum) {
       break;
     case "C4":
       // Edge 2 (2→3) and edge 0 (0→1) identify via isomSeg2Seg(v2,v3,v1,v0);
-      // edge 3 (3→0) is a reflection; edge 1 (1→2) is a crosscap boundary.
+      // edge 3 (3→0) is a reflection; edge 1 (1→2) is a crosscap step edge.
       // C4 never joins other atoms.
       if (vertNum === 0) return [2, true];
-      if (vertNum === 1) return -1; // crosscap boundary
+      if (vertNum === 1) return -1; // crosscap step edge
       if (vertNum === 2) return [0, true];
       if (vertNum === 3) return [3, false]; // reflection: isomSeg2SegFlip(v3,v0,v3,v0)
       break;
     case "C5":
       // Edge 4 (4→0) and edge 3 (3→4) identify via isomSeg2Seg(v4,v0,v4,v3);
-      // edges 0 (0→1) and 2 (2→3) are reflections; edge 1 (1→2) is a boundary.
+      // edges 0 (0→1) and 2 (2→3) are reflections; edge 1 (1→2) is a step edge.
       if (vertNum === 0) return [0, false]; // reflection: isomSeg2SegFlip(v0,v1,v0,v1)
-      if (vertNum === 1) return -1; // boundary
+      if (vertNum === 1) return -1; // step edge
       if (vertNum === 2) return [2, false]; // reflection: isomSeg2SegFlip(v2,v3,v2,v3)
       if (vertNum === 3) return [4, true];
       if (vertNum === 4) return [3, true];
@@ -465,15 +465,15 @@ function atomEdge(atomType, vertNum) {
       // Edge 5 (5→0) and edge 3 (3→4) identify via isomSeg2Seg(v5,v0,v4,v3);
       // edges 0 (0→1) and 2 (2→3) are reflections; edges 1 (1→2) and 4 (4→5) are boundaries.
       if (vertNum === 0) return [0, false]; // reflection: isomSeg2SegFlip(v0,v1,v0,v1)
-      if (vertNum === 1) return -1; // boundary
+      if (vertNum === 1) return -1; // step edge
       if (vertNum === 2) return [2, false]; // reflection: isomSeg2SegFlip(v2,v3,v2,v3)
       if (vertNum === 3) return [5, true];
-      if (vertNum === 4) return -1; // boundary
+      if (vertNum === 4) return -1; // step edge
       if (vertNum === 5) return [3, true];
       break;
     case "P3":
       // Insert mid1=midPoint(v0,v1) between v0 and v1 → 6 verts: 0=v0,1=mid1,2=v1,3=v2,4=v3,5=v4
-      // All edges pair via isomSeg2Seg; no boundary or reflection edges.
+      // All edges pair via isomSeg2Seg; no step edges or reflection edges.
       if (vertNum === 0) return [5, true];
       if (vertNum === 1) return [2, true];
       if (vertNum === 2) return [1, true];
@@ -483,8 +483,8 @@ function atomEdge(atomType, vertNum) {
       break;
     case "P4":
       // Insert mid1=midPoint(v1,v2) between v1 and v2 → 7 verts: 0=v0,1=v1,2=mid1,3=v2,4=v3,5=v4,6=v5
-      // Edge 0 (v0→v1) is a boundary edge.
-      if (vertNum === 0) return -1; // boundary
+      // Edge 0 (v0→v1) is a step edge.
+      if (vertNum === 0) return -1; // step edge
       if (vertNum === 1) return [6, true];
       if (vertNum === 2) return [3, true];
       if (vertNum === 3) return [2, true];
@@ -494,11 +494,11 @@ function atomEdge(atomType, vertNum) {
       break;
     case "P5":
       // Insert mid1=midPoint(v1,v2) between v1 and v2 → 8 verts: 0=v0,1=v1,2=mid1,3=v2,4=v3,5=v4,6=v5,7=v6
-      // Edges 0 (v0→v1) and 3 (v2→v3) are boundary edges.
-      if (vertNum === 0) return -1; // boundary
+      // Edges 0 (v0→v1) and 3 (v2→v3) are step edges.
+      if (vertNum === 0) return -1; // step edge
       if (vertNum === 1) return [7, true];
       if (vertNum === 2) return [4, true];
-      if (vertNum === 3) return -1; // boundary
+      if (vertNum === 3) return -1; // step edge
       if (vertNum === 4) return [2, true];
       if (vertNum === 5) return [6, true];
       if (vertNum === 6) return [5, true];
@@ -506,14 +506,14 @@ function atomEdge(atomType, vertNum) {
       break;
     case "P6":
       // Insert mid1=midPoint(v1,v2) between v1 and v2 → 9 verts: 0=v0,1=v1,2=mid1,3=v2,4=v3,5=v4,6=v5,7=v6,8=v7
-      // Edges 0 (v0→v1), 3 (v2→v3), and 6 (v5→v6) are boundary edges.
-      if (vertNum === 0) return -1; // boundary
+      // Edges 0 (v0→v1), 3 (v2→v3), and 6 (v5→v6) are step edges.
+      if (vertNum === 0) return -1; // step edge
       if (vertNum === 1) return [8, true];
       if (vertNum === 2) return [4, true];
-      if (vertNum === 3) return -1; // boundary
+      if (vertNum === 3) return -1; // step edge
       if (vertNum === 4) return [2, true];
       if (vertNum === 5) return [7, true];
-      if (vertNum === 6) return -1; // boundary
+      if (vertNum === 6) return -1; // step edge
       if (vertNum === 7) return [5, true];
       if (vertNum === 8) return [1, true];
       break;
@@ -1000,9 +1000,9 @@ function solve3Ang(alpha, beta, gamma) {
   let sideAY = (Math.cos(gamma)+Math.cos(alpha)*Math.cos(beta))/Math.sin(alpha);
   let sideAX = Math.cos(beta);
   let sideA = [-Math.sqrt(sideAX*sideAX+sideAY*sideAY-1),sideAX,-sideAY];
-  let vertAlpha = hNorm(crosProd(tRef(sideB),tRef(sideC)));
-  let vertBeta = hNorm(crosProd(tRef(sideC),tRef(sideA)));
-  let vertGamma = hNorm(crosProd(tRef(sideA),tRef(sideB)));
+  let vertAlpha = hNorm(crossProd(tRef(sideB),tRef(sideC)));
+  let vertBeta = hNorm(crossProd(tRef(sideC),tRef(sideA)));
+  let vertGamma = hNorm(crossProd(tRef(sideA),tRef(sideB)));
   return([vertAlpha,vertBeta,vertGamma]);
 }
 
@@ -1015,11 +1015,11 @@ function solve2Ang(alpha, beta, gamma) {
   let sideAT = (Math.cos(gamma)+Math.cosh(alpha)*Math.cos(beta))/Math.sinh(alpha);
   let sideAX = Math.cos(beta);
   let sideA = [sideAT,sideAX,Math.sqrt(-sideAX*sideAX+sideAT*sideAT+1)];
-  let segAlpha = hNorm(crosProd(tRef(sideB),tRef(sideC)));
-  let vertBeta = hNorm(crosProd(tRef(sideC),tRef(sideA)));
-  let vertGamma = hNorm(crosProd(tRef(sideA),tRef(sideB)));
-  let vertAlphaC = hNorm(crosProd(tRef(segAlpha),tRef(sideC)));
-  let vertAlphaB = hNorm(crosProd(tRef(segAlpha),tRef(sideB)));
+  let segAlpha = hNorm(crossProd(tRef(sideB),tRef(sideC)));
+  let vertBeta = hNorm(crossProd(tRef(sideC),tRef(sideA)));
+  let vertGamma = hNorm(crossProd(tRef(sideA),tRef(sideB)));
+  let vertAlphaC = hNorm(crossProd(tRef(segAlpha),tRef(sideC)));
+  let vertAlphaB = hNorm(crossProd(tRef(segAlpha),tRef(sideB)));
   return([vertAlphaB,vertAlphaC,vertBeta,vertGamma]);
 }
 
@@ -1032,13 +1032,13 @@ function solve1Ang(alpha, beta, gamma) {
   let sideAT = (Math.cos(gamma)+Math.cosh(alpha)*Math.cosh(beta))/Math.sinh(alpha);
   let sideAX = Math.cosh(beta);
   let sideA = [sideAT,sideAX,Math.sqrt(-sideAX*sideAX+sideAT*sideAT+1)];
-  let segAlpha = hNorm(crosProd(tRef(sideB),tRef(sideC)));
-  let segBeta = hNorm(crosProd(tRef(sideC),tRef(sideA)));
-  let vertGamma = hNorm(crosProd(tRef(sideA),tRef(sideB)));
-  let vertAlphaC = hNorm(crosProd(tRef(segAlpha),tRef(sideC)));
-  let vertAlphaB = hNorm(crosProd(tRef(segAlpha),tRef(sideB)));
-  let vertBetaA = hNorm(crosProd(tRef(segBeta),tRef(sideA)));
-  let vertBetaC = hNorm(crosProd(tRef(segBeta),tRef(sideC)));
+  let segAlpha = hNorm(crossProd(tRef(sideB),tRef(sideC)));
+  let segBeta = hNorm(crossProd(tRef(sideC),tRef(sideA)));
+  let vertGamma = hNorm(crossProd(tRef(sideA),tRef(sideB)));
+  let vertAlphaC = hNorm(crossProd(tRef(segAlpha),tRef(sideC)));
+  let vertAlphaB = hNorm(crossProd(tRef(segAlpha),tRef(sideB)));
+  let vertBetaA = hNorm(crossProd(tRef(segBeta),tRef(sideA)));
+  let vertBetaC = hNorm(crossProd(tRef(segBeta),tRef(sideC)));
   return([vertAlphaB,vertAlphaC,vertBetaC,vertBetaA,vertGamma]);
 }
 
@@ -1051,15 +1051,15 @@ function solve0Ang(alpha, beta, gamma) {
   let sideAT = (Math.cosh(gamma)+Math.cosh(alpha)*Math.cosh(beta))/Math.sinh(alpha);
   let sideAX = Math.cosh(beta);
   let sideA = [sideAT,sideAX,Math.sqrt(-sideAX*sideAX+sideAT*sideAT+1)];
-  let segAlpha = hNorm(crosProd(tRef(sideB),tRef(sideC)));
-  let segBeta = hNorm(crosProd(tRef(sideC),tRef(sideA)));
-  let segGamma = hNorm(crosProd(tRef(sideA),tRef(sideB)));
-  let vertAlphaC = hNorm(crosProd(tRef(segAlpha),tRef(sideC)));
-  let vertAlphaB = hNorm(crosProd(tRef(segAlpha),tRef(sideB)));
-  let vertBetaA = hNorm(crosProd(tRef(segBeta),tRef(sideA)));
-  let vertBetaC = hNorm(crosProd(tRef(segBeta),tRef(sideC)));
-  let vertGammaA = hNorm(crosProd(tRef(segGamma),tRef(sideA)));
-  let vertGammaB = hNorm(crosProd(tRef(segGamma),tRef(sideB)));
+  let segAlpha = hNorm(crossProd(tRef(sideB),tRef(sideC)));
+  let segBeta = hNorm(crossProd(tRef(sideC),tRef(sideA)));
+  let segGamma = hNorm(crossProd(tRef(sideA),tRef(sideB)));
+  let vertAlphaC = hNorm(crossProd(tRef(segAlpha),tRef(sideC)));
+  let vertAlphaB = hNorm(crossProd(tRef(segAlpha),tRef(sideB)));
+  let vertBetaA = hNorm(crossProd(tRef(segBeta),tRef(sideA)));
+  let vertBetaC = hNorm(crossProd(tRef(segBeta),tRef(sideC)));
+  let vertGammaA = hNorm(crossProd(tRef(segGamma),tRef(sideA)));
+  let vertGammaB = hNorm(crossProd(tRef(segGamma),tRef(sideB)));
 //alert([vertAlphaB,vertAlphaC,vertBetaC,vertBetaA,vertGammaA,vertGammaB]);
   return([vertAlphaB,vertAlphaC,vertBetaC,vertBetaA,vertGammaA,vertGammaB]);
 }
@@ -1120,14 +1120,14 @@ function isIncident(P,L) {
 
 // checks if two lines intersect
 function isIntersecting(L,M) {
-  let perpVect = crosProd(L,M);
+  let perpVect = crossProd(L,M);
   return(hDot(perpVect,perpVect) <= epsilon);
 }
 
 // return a line through two hyperbolic points. (given by the complement of a vector normal to plane.)
 function points2Line(P,Q) {
   let dist = hDist(P,Q);
-  let line = tRef(crosProd(P,Q));
+  let line = tRef(crossProd(P,Q));
   line[0] = line[0]/Math.sinh(dist);
   line[1] = line[1]/Math.sinh(dist);
   line[2] = line[2]/Math.sinh(dist);
@@ -1188,7 +1188,7 @@ function footOfPerp(P,L) {
 }
 
 // usual cross product
-function crosProd(P,Q) {
+function crossProd(P,Q) {
   return([P[1]*Q[2]-P[2]*Q[1], P[2]*Q[0]-P[0]*Q[2], P[0]*Q[1]-P[1]*Q[0]]);
 }
 
@@ -1571,14 +1571,6 @@ function setMode(newMode) {
   draw();
 }
 
-function setSymN() {
-  if (orbi > 7) {myRot = document.getElementById("symN").value;}
-}
-
-function setNgon() {
-  if (mode > 2) {mode = document.getElementById("ngon").value;}
-}
-
 function setColor() {
   color=document.getElementById("color").value;
 }
@@ -1591,40 +1583,6 @@ function setFill() {
 function setSnap() {
 //  snap=document.getElementById("snap").checked;
 //  alert(snap); UNNEEDED
-}
-
-function setOrb(newOrbifold) {
-  orbi = newOrbifold;
-  switch (orbi) {
-    case 1: // *732
-      stack=[];
-myRot = 7;
-symVects=[];
-symVects.push([0,1,0]);
-symVects.push([1,0,0]);
-symVects.push([0,1.6180339887498948482045868343656,1]);
-      NumMaps = 24;
-      break;
-    case 2: // 732
-      stack=[];
-myRot = 7;
-symVects=[];
-symVects.push([0,1,0]);
-symVects.push([1,0,0]);
-symVects.push([0,1.6180339887498948482045868343656,1]);
-      NumMaps = 12;
-      break;
-    case 3: // *832
-      stack=[];
-myRot = 8;
-symVects=[];
-symVects.push([0,1,0]);
-symVects.push([1,0,0]);
-      NumMaps = 12;
-      break;
-
-  } // end switch
-  draw();
 }
 
 function txtToFile(content, filename, contentType) {
@@ -2072,177 +2030,6 @@ function snapTo(checkX, checkY) {
       movePt=checkPoint(newPoint,1,0.5,movePt);
       movePt=checkPoint(newPoint,1,1,movePt);
       break;
-    case 3: // 4*2
-      movePt=checkLine(newPoint,1,-1,0,movePt);
-      movePt=checkLine(newPoint,1,1,-1,movePt);
-
-      movePt=checkPoint(newPoint,0,0,movePt);
-      movePt=checkPoint(newPoint,0,0.5,movePt);
-      movePt=checkPoint(newPoint,0,1,movePt);
-      movePt=checkPoint(newPoint,0.5,0,movePt);
-      movePt=checkPoint(newPoint,0.5,0.5,movePt);
-      movePt=checkPoint(newPoint,0.5,1,movePt);
-      movePt=checkPoint(newPoint,1,0,movePt);
-      movePt=checkPoint(newPoint,1,0.5,movePt);
-      movePt=checkPoint(newPoint,1,1,movePt);
-      break;
-    case 4: // *632
-      movePt=checkLine(newPoint,1,0,0,movePt); 
-      movePt=checkLine(newPoint,1,0,-1,movePt);
-      movePt=checkLine(newPoint,0,1,0,movePt); 
-      movePt=checkLine(newPoint,0,1,-1,movePt);
-      movePt=checkLine(newPoint,1,-1,0,movePt);
-      movePt=checkLine(newPoint,1,1,-1,movePt);
-      movePt=checkLine(newPoint,2,1,-1,movePt);
-      movePt=checkLine(newPoint,1,2,-1,movePt);
-      movePt=checkLine(newPoint,2,1,-2,movePt);
-      movePt=checkLine(newPoint,1,2,-2,movePt);
-
-      movePt=checkPoint(newPoint,0,0,movePt);
-      movePt=checkPoint(newPoint,0,0.5,movePt);
-      movePt=checkPoint(newPoint,0,1,movePt);
-      movePt=checkPoint(newPoint,0.3333333333333333333,0.3333333333333333333,movePt);
-      movePt=checkPoint(newPoint,0.5,0,movePt);
-      movePt=checkPoint(newPoint,0.5,0.5,movePt);
-      movePt=checkPoint(newPoint,0.5,1,movePt);
-      movePt=checkPoint(newPoint,0.6666666666666666666,0.6666666666666666666,movePt);
-      movePt=checkPoint(newPoint,1,0,movePt);
-      movePt=checkPoint(newPoint,1,0.5,movePt);
-      movePt=checkPoint(newPoint,1,1,movePt);
-      break;
-    case 5: // *333
-      movePt=checkLine(newPoint,2,1,-1,movePt);
-      movePt=checkLine(newPoint,1,2,-1,movePt);
-      movePt=checkLine(newPoint,2,1,-2,movePt);
-      movePt=checkLine(newPoint,1,2,-2,movePt);
-      movePt=checkLine(newPoint,1,-1,0,movePt);
-
-      movePt=checkPoint(newPoint,0,0,movePt);
-      movePt=checkPoint(newPoint,0,1,movePt);
-      movePt=checkPoint(newPoint,0.3333333333333333333,0.3333333333333333333,movePt);
-      movePt=checkPoint(newPoint,0.6666666666666666666,0.6666666666666666666,movePt);
-      movePt=checkPoint(newPoint,1,0,movePt);
-      movePt=checkPoint(newPoint,1,1,movePt);
-      break;
-    case 6: // 632
-      movePt=checkPoint(newPoint,0,0,movePt);
-      movePt=checkPoint(newPoint,0,0.5,movePt);
-      movePt=checkPoint(newPoint,0,1,movePt);
-      movePt=checkPoint(newPoint,0.3333333333333333333,0.3333333333333333333,movePt);
-      movePt=checkPoint(newPoint,0.5,0,movePt);
-      movePt=checkPoint(newPoint,0.5,0.5,movePt);
-      movePt=checkPoint(newPoint,0.5,1,movePt);
-      movePt=checkPoint(newPoint,0.6666666666666666666,0.6666666666666666666,movePt);
-      movePt=checkPoint(newPoint,1,0,movePt);
-      movePt=checkPoint(newPoint,1,0.5,movePt);
-      movePt=checkPoint(newPoint,1,1,movePt);
-      break;
-    case 7: // 333
-      movePt=checkPoint(newPoint,0,0,movePt);
-      movePt=checkPoint(newPoint,0,1,movePt);
-      movePt=checkPoint(newPoint,0.3333333333333333333,0.3333333333333333333,movePt);
-      movePt=checkPoint(newPoint,0.6666666666666666666,0.6666666666666666666,movePt);
-      movePt=checkPoint(newPoint,1,0,movePt);
-      movePt=checkPoint(newPoint,1,1,movePt);
-      break;
-    case 8: // 3*3
-      movePt=checkLine(newPoint,1,0,0,movePt); 
-      movePt=checkLine(newPoint,1,0,-1,movePt);
-      movePt=checkLine(newPoint,0,1,0,movePt); 
-      movePt=checkLine(newPoint,0,1,-1,movePt);
-      movePt=checkLine(newPoint,1,1,-1,movePt);
-
-      movePt=checkPoint(newPoint,0,0,movePt);
-      movePt=checkPoint(newPoint,0,1,movePt);
-      movePt=checkPoint(newPoint,0.3333333333333333333,0.3333333333333333333,movePt);
-      movePt=checkPoint(newPoint,0.6666666666666666666,0.6666666666666666666,movePt);
-      movePt=checkPoint(newPoint,1,0,movePt);
-      movePt=checkPoint(newPoint,1,1,movePt);
-      break;
-    case 9: // 22x
-      movePt=checkPoint(newPoint,0,0,movePt);
-      movePt=checkPoint(newPoint,0,0.5,movePt);
-      movePt=checkPoint(newPoint,0,1,movePt);
-      movePt=checkPoint(newPoint,0.5,0,movePt);
-      movePt=checkPoint(newPoint,0.5,0.5,movePt);
-      movePt=checkPoint(newPoint,0.5,1,movePt);
-      movePt=checkPoint(newPoint,1,0,movePt);
-      movePt=checkPoint(newPoint,1,0.5,movePt);
-      movePt=checkPoint(newPoint,1,1,movePt);
-      break;
-    case 10: // *2222
-      movePt=checkLine(newPoint,1,0,0,movePt); 
-      movePt=checkLine(newPoint,1,0,-0.5,movePt);
-      movePt=checkLine(newPoint,1,0,-1,movePt);
-      movePt=checkLine(newPoint,0,1,0,movePt); 
-      movePt=checkLine(newPoint,0,1,-0.5,movePt);
-      movePt=checkLine(newPoint,0,1,-1,movePt);
-
-      movePt=checkPoint(newPoint,0,0,movePt);
-      movePt=checkPoint(newPoint,0,0.5,movePt);
-      movePt=checkPoint(newPoint,0,1,movePt);
-      movePt=checkPoint(newPoint,0.5,0,movePt);
-      movePt=checkPoint(newPoint,0.5,0.5,movePt);
-      movePt=checkPoint(newPoint,0.5,1,movePt);
-      movePt=checkPoint(newPoint,1,0,movePt);
-      movePt=checkPoint(newPoint,1,0.5,movePt);
-      movePt=checkPoint(newPoint,1,1,movePt);
-      break;
-    case 11: // 22*
-      movePt=checkLine(newPoint,1,0,-0.25,movePt); 
-      movePt=checkLine(newPoint,1,0,-0.75,movePt);
-
-      movePt=checkPoint(newPoint,0,0,movePt);
-      movePt=checkPoint(newPoint,0,0.5,movePt);
-      movePt=checkPoint(newPoint,0,1,movePt);
-      movePt=checkPoint(newPoint,0.5,0,movePt);
-      movePt=checkPoint(newPoint,0.5,0.5,movePt);
-      movePt=checkPoint(newPoint,0.5,1,movePt);
-      movePt=checkPoint(newPoint,1,0,movePt);
-      movePt=checkPoint(newPoint,1,0.5,movePt);
-      movePt=checkPoint(newPoint,1,1,movePt);
-      break;
-    case 12: // **
-      movePt=checkLine(newPoint,1,0,0,movePt); 
-      movePt=checkLine(newPoint,1,0,-0.5,movePt);
-      movePt=checkLine(newPoint,1,0,-1,movePt);
-
-      break;
-    case 13: // xx
-
-      break;
-    case 14: // 2*22
-      movePt=checkLine(newPoint,1,-1,0,movePt);
-      movePt=checkLine(newPoint,1,1,-1,movePt);
-
-      movePt=checkPoint(newPoint,0,0,movePt);
-      movePt=checkPoint(newPoint,0,0.5,movePt);
-      movePt=checkPoint(newPoint,0,1,movePt);
-      movePt=checkPoint(newPoint,0.5,0,movePt);
-      movePt=checkPoint(newPoint,0.5,0.5,movePt);
-      movePt=checkPoint(newPoint,0.5,1,movePt);
-      movePt=checkPoint(newPoint,1,0,movePt);
-      movePt=checkPoint(newPoint,1,0.5,movePt);
-      movePt=checkPoint(newPoint,1,1,movePt);
-      break;
-    case 15: // *x
-      movePt=checkLine(newPoint,1,1,-1,movePt);
-
-      break;
-    case 16: // 2222
-      movePt=checkPoint(newPoint,0,0,movePt);
-      movePt=checkPoint(newPoint,0,0.5,movePt);
-      movePt=checkPoint(newPoint,0,1,movePt);
-      movePt=checkPoint(newPoint,0.5,0,movePt);
-      movePt=checkPoint(newPoint,0.5,0.5,movePt);
-      movePt=checkPoint(newPoint,0.5,1,movePt);
-      movePt=checkPoint(newPoint,1,0,movePt);
-      movePt=checkPoint(newPoint,1,0.5,movePt);
-      movePt=checkPoint(newPoint,1,1,movePt);
-      break;
-    case 17: // o
-
-      break;
   } // end switch      
   return(movePt);
 } //end snapTo()
@@ -2276,377 +2063,6 @@ function checkLine(newPoint,aa,bb,cc,movePt) {
 
 
 
-function MapOne(myMap, myOrbi,x,y,z) {
-//alert(myOrbi);
-  var xOut, yOut, zOut;
-  switch (myOrbi) {
-    case 1: // *732
-      switch(myMap) {
-        case 1:
-          xOut = x;
-          yOut = y;
-          zOut = z;
-          break;
-        case 2:
-          var newPt = multVectMat([x,y,z] ,rotMat(symVects[2],Math.PI));
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 3:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[0],0.4*Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[2],Math.PI));
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 4:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[0],0.8*Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[2],Math.PI));
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 5:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[0],1.2*Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[2],Math.PI));
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 6:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[0],1.6*Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[2],Math.PI));
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 7:
-          var newPt = multVectMat([x,y,z] ,rotMat(symVects[1],Math.PI));
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 8:
-          var newPt = multVectMat([x,y,z] ,rotMat(symVects[2],Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[1],Math.PI));
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 9:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[0],0.4*Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[2],Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[1],Math.PI));
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 10:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[0],0.8*Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[2],Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[1],Math.PI));
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 11:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[0],1.2*Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[2],Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[1],Math.PI));
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 12:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[0],1.6*Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[2],Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[1],Math.PI));
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 13:
-          var newPt = reflect(symVects[1],[x,y,z]);
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 14:
-          var newPt = multVectMat([x,y,z] ,rotMat(symVects[2],Math.PI));
-          newPt = reflect(symVects[1],newPt);
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 15:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[0],0.4*Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[2],Math.PI));
-          newPt = reflect(symVects[1],newPt);
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 16:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[0],0.8*Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[2],Math.PI));
-          newPt = reflect(symVects[1],newPt);
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 17:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[0],1.2*Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[2],Math.PI));
-          newPt = reflect(symVects[1],newPt);
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 18:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[0],1.6*Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[2],Math.PI));
-          newPt = reflect(symVects[1],newPt);
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 19:
-          var newPt = multVectMat([x,y,z] ,rotMat(symVects[1],Math.PI));
-          newPt = reflect(symVects[1],newPt);
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 20:
-          var newPt = multVectMat([x,y,z] ,rotMat(symVects[2],Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[1],Math.PI));
-          newPt = reflect(symVects[1],newPt);
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 21:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[0],0.4*Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[2],Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[1],Math.PI));
-          newPt = reflect(symVects[1],newPt);
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 22:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[0],0.8*Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[2],Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[1],Math.PI));
-          newPt = reflect(symVects[1],newPt);
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 23:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[0],1.2*Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[2],Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[1],Math.PI));
-          newPt = reflect(symVects[1],newPt);
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 24:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[0],1.6*Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[2],Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[1],Math.PI));
-          newPt = reflect(symVects[1],newPt);
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-      } // end *732
-      break;  
-    case 2: // 732
-      switch(myMap) {
-        case 1:
-          xOut = x;
-          yOut = y;
-          zOut = z;
-          break;
-        case 2:
-          var newPt = multVectMat([x,y,z] ,rotMat(symVects[2],Math.PI));
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 3:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[0],0.4*Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[2],Math.PI));
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 4:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[0],0.8*Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[2],Math.PI));
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 5:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[0],1.2*Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[2],Math.PI));
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 6:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[0],1.6*Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[2],Math.PI));
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 7:
-          var newPt = multVectMat([x,y,z] ,rotMat(symVects[1],Math.PI));
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 8:
-          var newPt = multVectMat([x,y,z] ,rotMat(symVects[2],Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[1],Math.PI));
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 9:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[0],0.4*Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[2],Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[1],Math.PI));
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 10:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[0],0.8*Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[2],Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[1],Math.PI));
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 11:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[0],1.2*Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[2],Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[1],Math.PI));
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 12:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[0],1.6*Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[2],Math.PI));
-          newPt = multVectMat(newPt ,rotMat(symVects[1],Math.PI));
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-      } // end 732
-      break;  
-    case 3: // *832
-      switch(myMap) {
-        case 1:
-          xOut = x;
-          yOut = y;
-          zOut = z;
-          break;
-        case 2:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[1],Math.PI/2));
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 3:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[0],Math.PI/2));
-          newPt = multVectMat(newPt,rotMat(symVects[1],Math.PI/2));
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 4:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[1],Math.PI));
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 5:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[1],Math.PI/2));
-          newPt = multVectMat(newPt,rotMat(symVects[1],Math.PI));
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 6:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[0],Math.PI/2));
-          newPt = multVectMat(newPt,rotMat(symVects[1],Math.PI/2));
-          newPt = multVectMat(newPt,rotMat(symVects[1],Math.PI));
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 7:
-          var newPt = reflect(symVects[1],[x,y,z]);
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 8:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[1],Math.PI/2));
-          newPt = reflect(symVects[1],newPt);
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 9:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[0],Math.PI/2));
-          newPt = multVectMat(newPt,rotMat(symVects[1],Math.PI/2));
-          newPt = reflect(symVects[1],newPt);
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 10:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[1],Math.PI));
-          newPt = reflect(symVects[1],newPt);
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 11:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[1],Math.PI/2));
-          newPt = multVectMat(newPt,rotMat(symVects[1],Math.PI));
-          newPt = reflect(symVects[1],newPt);
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-        case 12:
-          var newPt = multVectMat([x,y,z],rotMat(symVects[0],Math.PI/2));
-          newPt = multVectMat(newPt,rotMat(symVects[1],Math.PI/2));
-          newPt = multVectMat(newPt,rotMat(symVects[1],Math.PI));
-          newPt = reflect(symVects[1],newPt);
-          xOut = newPt[0];
-          yOut = newPt[1];
-          zOut = newPt[2];
-          break;
-      } // end *832
-      break;  
-
-  } // end switch(myOrbi)
-  return([xOut,yOut,zOut]);
-
-} // end MapOne
-*/
-
 
 
 
@@ -2658,15 +2074,15 @@ function drawSeg2(P,Q,context) {
   let scrP = pt2Screen(P,hZoom);
   let scrQ = pt2Screen(Q,hZoom);
 
-  let R = crosProd(P,Q);
+  let R = crossProd(P,Q);
   let refR = tRef(R);
   let S;
   if (JSON.stringify(R) === JSON.stringify(refR)) {
-    S = crosProd(R,[1,0,0]);
+    S = crossProd(R,[1,0,0]);
   } else {
-    S = crosProd(R,refR);
+    S = crossProd(R,refR);
   }
-  let T = crosProd(S,R);
+  let T = crossProd(S,R);
   S = hNorm(S);
   T = hNorm(T);
 alert([S,T]);
@@ -2681,8 +2097,8 @@ alert([S,T]);
 
 /*
 
-  let U = crosProd(R,[1,0,0]);
-  let V = crosProd(R,U);
+  let U = crossProd(R,[1,0,0]);
+  let V = crossProd(R,U);
   let rescale = 0.2/V[0];
   V = scalarVect(rescale,V);
 //alert(JSON.stringify([P,Q,R,U,V]));
