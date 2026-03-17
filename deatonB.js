@@ -2,16 +2,17 @@ let handle = 0;
 let crosscap = 0;
 let cone = [7,3,4];
 let kali = [];
-// infCount is for the inf. edges (ultra parallel lines)
-let infCount = 0; // these count down negative, telling which ulta parallel "infinity" angle it is.
-// For infArray, the zeroth entry is 0. Following entries at -infCount will look like [4,2] or [3,2,0]
-let infArray = [0]; // The numbers are: step number, length and twist. (if there's a twist)
+// stepEdgeCount is for the edges between ultra parallel lines that are created during steps.
+let stepEdgeCount = 0; // these count down negative, telling which ultra parallel step edge it is.
+// For stepEdges, the zeroth entry is 0. Following entries at -stepEdgeCount will look like [4,2] or [3,2,0]
+let stepEdges = [0]; // The numbers are: step number, length and twist. (if there's a twist)
 let newCone = JSON.parse(JSON.stringify(cone));
 let newKali = []; // note that newKali will have one less layer of [] than kali, since it's just one.
-let atomList = []; // each atom will look like ["pillow",7,3,-2] with the positive numbers being angles and negatives being ultraparallel 
+let atomList = []; // each atom will look like ["pillow",7,3,-2] with the positive numbers being angles and negatives being ultraparallel
+let stepEdgeMaps = [0]; // [0] at index 0; for each ultra-parallel edge: [[atom#, startVert, endVert], ...]
 let newSheet = [];
 let newPillow = [];
-let maxInfJoin;
+let firstInnerStepEdgeMap;
 
 let FDVerts = []; // elements will look like [atom#, atomVert#, FDMapVert, isDirect]
 // Do the first two in the first pass then add then following. I may want to save the coordinates here?
@@ -154,8 +155,8 @@ function reDo() {
   crosscap = Number(document.getElementById("crosscap").value);
   cone = JSON.parse(document.getElementById("cone").value);
   kali = JSON.parse(document.getElementById("kali").value);
-  infCount = 0;
-  infArray = [0];
+  stepEdgeCount = 0;
+  stepEdges = [0];
   newCone = JSON.parse(JSON.stringify(cone));
   newKali = []; // note that newKali will have one less layer of [] than kali, since it's just one.
   atomList = [];
@@ -164,11 +165,11 @@ function reDo() {
 
 console.log(JSON.stringify([handle,crosscap,cone,kali]));
 console.log(JSON.stringify(atomList));
-console.log(JSON.stringify(infArray));
+console.log(JSON.stringify(stepEdges));
 
-  let infJoins = [0];
-  for (let i = 1;i<infArray.length;i++) {
-    infJoins.push([]);
+  stepEdgeMaps = [0];
+  for (let i = 1;i<stepEdges.length;i++) {
+    stepEdgeMaps.push([]);
   }
 
   atomPtList = [];
@@ -183,35 +184,37 @@ console.log(JSON.stringify(infArray));
       if (nextAtom[j]>0) {
         paramList.push(nextAtom[j]);
       } else {
-        paramList.push(infArray[-nextAtom[j]][1]);
+        paramList.push(stepEdges[-nextAtom[j]][1]);
 // need more params if twist? No, cause we're just doing shape. Twist will affect joins.
         let joinCoords = findJoinCoords(nextType,j);
-        infJoins[-nextAtom[j]].push([i,joinCoords[0],joinCoords[1]]);
+        stepEdgeMaps[-nextAtom[j]].push([i,joinCoords[0],joinCoords[1]]);
       }
     } // end nextAtom loop
     
-//alert(JSON.stringify(infJoins));
+//alert(JSON.stringify(stepEdgeMaps));
 //alert(JSON.stringify([i,nextType,paramList,nextAtom]));
-//alert(JSON.stringify(infArray));
+//alert(JSON.stringify(stepEdges));
 
     nextShape = getAtom(nextType,paramList);
 
 // where to place this atom?
 // it will always connect to one of the previous.
 // join only from rules 7,8,9.
-// start at 1-maxInfJoin to only join inf from rules 7,8,9
+// start at 1-firstInnerStepEdgeMap to only join step edges from rules 7,8,9
+// we will call these inner step edges since they will be connected inside the fundamental domain.
+// The other step edges will be outer and will connect with other outer step edges. (possible themself)
 // *** need to add twist for rule 8.
 
     if (i > 0) { // move nextShape to fit with previous shapes. 
-      for (let j=1-maxInfJoin;j<infJoins.length;j++) {
-        if ((infJoins[j].length > 1) && (infJoins[j][1][0] === i)) {
-          let currentMat = isomSeg2Seg(nextShape[infJoins[j][1][1]],nextShape[infJoins[j][1][2]],
-                                       atomPtList[infJoins[j][0][0]][infJoins[j][0][2]],
-                                       atomPtList[infJoins[j][0][0]][infJoins[j][0][1]]);
+      for (let j=1-firstInnerStepEdgeMap;j<stepEdgeMaps.length;j++) {
+        if ((stepEdgeMaps[j].length > 1) && (stepEdgeMaps[j][1][0] === i)) {
+          let currentMat = isomSeg2Seg(nextShape[stepEdgeMaps[j][1][1]],nextShape[stepEdgeMaps[j][1][2]],
+                                       atomPtList[stepEdgeMaps[j][0][0]][stepEdgeMaps[j][0][2]],
+                                       atomPtList[stepEdgeMaps[j][0][0]][stepEdgeMaps[j][0][1]]);
           for (let k = 0;k<nextShape.length;k++) {
             nextShape[k]=multMatVect(currentMat,nextShape[k]);
           } // end k loop
-          j = infJoins.length; // find first match. Then stop.
+          j = stepEdgeMaps.length; // find first match. Then stop.
         } // end if
       } // end j loop
     } // end if i > 0
@@ -222,7 +225,7 @@ console.log(JSON.stringify(distNAng(nextShape)));
     atomPtList.push(nextShape);
   } // end atomList loop
 
-console.log(JSON.stringify(infJoins));
+console.log(JSON.stringify(stepEdgeMaps));
 console.log("*");
 console.log(JSON.stringify(atomPtList));
 
@@ -239,15 +242,15 @@ console.log(JSON.stringify(atomPtList));
 
     // Choice A: does edge (currentVert, nextVert) connect to another atom?
     let foundJoin = false;
-    for (let j = 1 - maxInfJoin; j < infJoins.length; j++) {
-      if (infJoins[j].length < 2) continue;
+    for (let j = 1 - firstInnerStepEdgeMap; j < stepEdgeMaps.length; j++) {
+      if (stepEdgeMaps[j].length < 2) continue;
       for (let matchIdx = 0; matchIdx <= 1; matchIdx++) {
-        if (infJoins[j][matchIdx][0] === currentAtom &&
-            infJoins[j][matchIdx][1] === currentVert &&
-            infJoins[j][matchIdx][2] === nextVert) {
+        if (stepEdgeMaps[j][matchIdx][0] === currentAtom &&
+            stepEdgeMaps[j][matchIdx][1] === currentVert &&
+            stepEdgeMaps[j][matchIdx][2] === nextVert) {
           let otherIdx = 1 - matchIdx;
-          currentAtom = infJoins[j][otherIdx][0];
-          currentVert = infJoins[j][otherIdx][2]; // vertex coinciding with currentVert
+          currentAtom = stepEdgeMaps[j][otherIdx][0];
+          currentVert = stepEdgeMaps[j][otherIdx][2]; // vertex coinciding with currentVert
           foundJoin = true;
           break;
         }
@@ -587,29 +590,30 @@ function changeParams() {
 
 // this will process the orbifold and output the atoms.
 // For angles, we have a positive integer, telling how many repeats in 360 degrees.
-// Whenever we have ultra parallel lines instead of an angle, there is some distance between the lines.
-// We keep track of these "infinities" with infCount. We use negative integers to index which infinity.
-// We will have a length for all such infinities and sometimes a twist.
-// It sets atomList and infArray
+// Whenever we have ultra parallel lines instead of an angle, there is some distance between the lines. 
+// we call the segment of this length a step edge, since it is created during one of the steps.
+// We keep track of these edges with stepEdgeCount. We use negative integers to index which step edge we use.
+// We will have a length for all such edges and sometimes a twist.
+// It sets atomList and stepEdges
 function orbi2Atoms() {
 
   for (let i = 0; i<handle; i++) { // step 3: remove handle.
-    infCount--;
-    newCone.push(infCount);
-    newCone.push(infCount);
-    infArray.push([3,2,0]); // step 3. length 2. twist 0.
+    stepEdgeCount--;
+    newCone.push(stepEdgeCount);
+    newCone.push(stepEdgeCount);
+    stepEdges.push([3,2,0]); // step 3. length 2. twist 0.
   }
 
-  //alert(JSON.stringify([3,newCone,newKali,infArray,atomList]));
+  //alert(JSON.stringify([3,newCone,newKali,stepEdges,atomList]));
 
 //  alert(JSON.stringify([handle, crosscap, cone, kali]));
   for (let i = 0; i<crosscap; i++) { // step 2: remove crosscap. 
-    infCount--;
-    newCone.push(infCount);
-    infArray.push([2,2]); // step 2, length 2
+    stepEdgeCount--;
+    newCone.push(stepEdgeCount);
+    stepEdges.push([2,2]); // step 2, length 2
   }
 
-  //alert(JSON.stringify([2,newCone,newKali,infArray,atomList]));
+  //alert(JSON.stringify([2,newCone,newKali,stepEdges,atomList]));
 
   if (kali.length > 0) { // here there are kaleidoscopes
     for (let i=0; i< kali.length; i++) { // ensure "2" corners adjacent if possible.
@@ -626,44 +630,44 @@ function orbi2Atoms() {
     newKali = JSON.parse(JSON.stringify(kali[0]));
     if (kali.length > 1) { // step 1. Join kalis.
 
-      let minInfCount = infCount;
+      let minStepEdgeCount = stepEdgeCount;
       newKali = JSON.parse(JSON.stringify(kali[0]));
       for (let i=1;i<kali.length;i++) { 
-        infCount--;
-        newKali.push(infCount);
-        infArray.push([1,2]); // step 1. length 2
+        stepEdgeCount--;
+        newKali.push(stepEdgeCount);
+        stepEdges.push([1,2]); // step 1. length 2
         newKali.push(...kali[i]);
       } // end i loop through all kalis
-      for (let i=infCount;i<minInfCount ;i++) { // add matching inf edges
+      for (let i=stepEdgeCount;i<minStepEdgeCount ;i++) { // add matching step edges
         newKali.push(i);
       }
     } // end step 1
 
-  //alert(JSON.stringify([1,newCone,newKali,infArray,atomList]));
+  //alert(JSON.stringify([1,newCone,newKali,stepEdges,atomList]));
 
     for (let i=0; i<newCone.length; i++) { // step 4. "2" cone and kali.
       if (newCone[i] === 2) { // remove cone. add corner.
         newCone.splice(i, 1);
-        infCount--;
-        newKali.push(infCount);
-        infArray.push([4,2]); // step 4. length 2
+        stepEdgeCount--;
+        newKali.push(stepEdgeCount);
+        stepEdges.push([4,2]); // step 4. length 2
         i--;
       }
     } // end step 4
 
-  //alert(JSON.stringify([4,newCone,newKali,infArray,atomList]));
+  //alert(JSON.stringify([4,newCone,newKali,stepEdges,atomList]));
 
     for (let i=0; i<newKali.length-1; i++) {   // step 6. "22" corners adjacent
       if ((newKali[i] === 2) && (newKali[i+1] === 2)) {
-        infCount--;
-        newKali.splice(i, 2,infCount);
-        infArray.push([6,2]); // step 6. length 2
+        stepEdgeCount--;
+        newKali.splice(i, 2,stepEdgeCount);
+        stepEdges.push([6,2]); // step 6. length 2
       } 
     } // end step 6
 
-  //alert(JSON.stringify([6,newCone,newKali,infArray,atomList]));
+  //alert(JSON.stringify([6,newCone,newKali,stepEdges,atomList]));
 
-    maxInfJoin = infCount;
+    firstInnerStepEdgeMap = stepEdgeCount;
     let pCaseName;
     if ((newCone.length === 1) && (newKali.length === 1)) { // just a pCase
       pCaseName = findPCase(newCone[0],newKali[0]);
@@ -674,27 +678,27 @@ function orbi2Atoms() {
           pCaseName = findPCase(newCone[i],newKali[0]);
           atomList.push([pCaseName,newCone[i],newKali[0]]);
         } else {
-          infCount--;
-          pCaseName = findPCase(newCone[i],infCount);
-          atomList.push([pCaseName,newCone[i],infCount]);
-          newKali.push(infCount);
-          infArray.push([7,2]); // step 7. length 2
+          stepEdgeCount--;
+          pCaseName = findPCase(newCone[i],stepEdgeCount);
+          atomList.push([pCaseName,newCone[i],stepEdgeCount]);
+          newKali.push(stepEdgeCount);
+          stepEdges.push([7,2]); // step 7. length 2
         }
       } // end step 7
     } // end plural pCases
 
- // alert(JSON.stringify([7,newCone,newKali,infArray,atomList]));
+ // alert(JSON.stringify([7,newCone,newKali,stepEdges,atomList]));
 
     if (newKali.length === 3) { // just one sheet
       newSheet = rotList([Number(newKali[0]),Number(newKali[1]),Number(newKali[2])]);
       atomList.push(["S"+(3+newSheet[3]),newSheet[0],newSheet[1],newSheet[2]]);
     } else { // many corners
       for (let i=0; i<newKali.length-3; i++) { // step 9. (sheet)
-        infCount--;
-        newSheet = rotList([Number(newKali[i]),Number(newKali[i+1]),Number(infCount)]);
+        stepEdgeCount--;
+        newSheet = rotList([Number(newKali[i]),Number(newKali[i+1]),Number(stepEdgeCount)]);
         atomList.push(["S"+(3+newSheet[3]),newSheet[0],newSheet[1],newSheet[2]]);
-        newKali.push(infCount);
-        infArray.push([9,2]); // step 9. length 2
+        newKali.push(stepEdgeCount);
+        stepEdges.push([9,2]); // step 9. length 2
         i++;
         if (i === newKali.length-4) { // last sheet
           newSheet = rotList([Number(newKali[i+1]),Number(newKali[i+2]),Number(newKali[i+3])]);
@@ -703,15 +707,15 @@ function orbi2Atoms() {
       } // end step 9
     } // end many corners
 
-//  alert(JSON.stringify([9,newCone,newKali,infArray,atomList]));
+//  alert(JSON.stringify([9,newCone,newKali,stepEdges,atomList]));
 
   } else { // here: no kaleidoscopes.
     newCone = newCone.sort(function(a, b){return b-a});
     for (let i=0; i<newCone.length-1; i++) {  // step 5. two "2" cones
       if ((newCone[i] === 2) && (newCone[i+1] === 2)) {
-        infCount--;
-        newCone.splice(i,2,infCount);
-        infArray.push([5,2]); // step 5. length 2
+        stepEdgeCount--;
+        newCone.splice(i,2,stepEdgeCount);
+        stepEdges.push([5,2]); // step 5. length 2
       } 
     } // end step 5
 
@@ -725,19 +729,19 @@ function orbi2Atoms() {
       }
     }
 
-  alert(JSON.stringify([5,newCone,newKali,infArray,atomList]));
+  alert(JSON.stringify([5,newCone,newKali,stepEdges,atomList]));
 
-    maxInfJoin = infCount;
+    firstInnerStepEdgeMap = stepEdgeCount;
     if (newCone.length === 3) { // just one pillow
       newPillow = rotList([newCone[0],newCone[1],newCone[2]]);
       atomList.push(["P"+(3+newPillow[3]),newPillow[0],newPillow[1],newPillow[2]]);
     } else { // many cones
       for (let i=0; i<newCone.length-3; i++) {  // step 8. (pillow) remember twist.
-        infCount--;
-        newPillow = rotList([newCone[i],newCone[i+1],infCount]);
+        stepEdgeCount--;
+        newPillow = rotList([newCone[i],newCone[i+1],stepEdgeCount]);
         atomList.push(["P"+(3+newPillow[3]),newPillow[0],newPillow[1],newPillow[2]]);
-        newCone.push(infCount);
-        infArray.push([8,2,0]); // step 8. length 2. twist 0.
+        newCone.push(stepEdgeCount);
+        stepEdges.push([8,2,0]); // step 8. length 2. twist 0.
         i++;
         if (i === newCone.length-4) { // last pillow
           newPillow = rotList([newCone[i+1],newCone[i+2],newCone[i+3]]);
@@ -746,12 +750,12 @@ function orbi2Atoms() {
       } // end step 8
     } // end many cones
 
- // alert(JSON.stringify([8,newCone,newKali,infArray,atomList]));
+ // alert(JSON.stringify([8,newCone,newKali,stepEdges,atomList]));
 
   } // end no kaleidoscopes
 
-// I don't need to return anything, since this sets atomList and infArray.
-//  let answer = JSON.stringify([atomList,infArray,"final", newCone,newKali]);
+// I don't need to return anything, since this sets atomList and stepEdges.
+//  let answer = JSON.stringify([atomList,stepEdges,"final", newCone,newKali]);
 //  alert(answer);
 //  return(answer);
 } // end orbi2Atoms()
