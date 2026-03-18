@@ -3,16 +3,16 @@ let crosscap = 0;
 let cone = [7,3,4];
 let kali = [];
 // stepEdgeCount is for the edges between ultra parallel lines that are created during steps.
-let stepEdgeCount = 0; // these count down negative, telling which ultra parallel step edge it is.
-// For stepEdges, the zeroth entry is 0. Following entries at -stepEdgeCount will look like [4,2] or [3,2,0]
+let stepEdgeCount = 0; // We will store as negative, telling which ultra parallel step edge it is.
+// For stepEdges, the zeroth entry is 0. Following entries at stepEdgeCount will look like [4,2] or [3,2,0]
 let stepEdges = [0]; // The numbers are: step number, length and twist. (if there's a twist)
 let newCone = JSON.parse(JSON.stringify(cone));
 let newKali = []; // note that newKali will have one less layer of [] than kali, since it's just one.
 let atomList = []; // each atom will look like ["pillow",7,3,-2] with the positive numbers being angles and negatives being ultraparallel
-let stepEdgeMaps = [0]; // [0] at index 0; for each ultra-parallel edge: [[atom#, startVert, endVert], ...]
+let match = [0]; // [0] at index 0; for each ultra-parallel edge: [[atom#, startVert, endVert], ...]
 let newSheet = [];
 let newPillow = [];
-let firstInnerStepEdgeMap;
+let firstInnerMatch;
 
 let FDVerts = []; // elements will look like [atom#, atomVert#, FDMapVert, isDirect]
 // Do the first two in the first pass then add then following. I may want to save the coordinates here?
@@ -167,9 +167,9 @@ console.log(JSON.stringify([handle,crosscap,cone,kali]));
 console.log(JSON.stringify(atomList));
 console.log(JSON.stringify(stepEdges));
 
-  stepEdgeMaps = [0];
+  match = [0];
   for (let i = 1;i<stepEdges.length;i++) {
-    stepEdgeMaps.push([]);
+    match.push([]);
   }
 
   atomPtList = [];
@@ -187,11 +187,11 @@ console.log(JSON.stringify(stepEdges));
         paramList.push(stepEdges[-nextAtom[j]][1]);
 // need more params if twist? No, cause we're just doing shape. Twist will affect joins.
         let joinCoords = findJoinCoords(nextType,j);
-        stepEdgeMaps[-nextAtom[j]].push([i,joinCoords[0],joinCoords[1]]);
+        match[-nextAtom[j]].push([i,joinCoords[0],joinCoords[1]]);
       }
     } // end nextAtom loop
     
-//alert(JSON.stringify(stepEdgeMaps));
+//alert(JSON.stringify(match));
 //alert(JSON.stringify([i,nextType,paramList,nextAtom]));
 //alert(JSON.stringify(stepEdges));
 
@@ -200,21 +200,21 @@ console.log(JSON.stringify(stepEdges));
 // where to place this atom?
 // it will always connect to one of the previous.
 // join only from rules 7,8,9.
-// start at 1-firstInnerStepEdgeMap to only join step edges from rules 7,8,9
+// start at firstInnerMatch+1 to only join step edges from rules 7,8,9
 // we will call these inner step edges since they will be connected inside the fundamental domain.
 // The other step edges will be outer and will connect with other outer step edges. (possible themself)
 // *** need to add twist for rule 8.
 
     if (i > 0) { // move nextShape to fit with previous shapes. 
-      for (let j=1-firstInnerStepEdgeMap;j<stepEdgeMaps.length;j++) {
-        if ((stepEdgeMaps[j].length > 1) && (stepEdgeMaps[j][1][0] === i)) {
-          let currentMat = isomSeg2Seg(nextShape[stepEdgeMaps[j][1][1]],nextShape[stepEdgeMaps[j][1][2]],
-                                       atomPtList[stepEdgeMaps[j][0][0]][stepEdgeMaps[j][0][2]],
-                                       atomPtList[stepEdgeMaps[j][0][0]][stepEdgeMaps[j][0][1]]);
+      for (let j=firstInnerMatch+1;j<match.length;j++) {
+        if ((match[j].length > 1) && (match[j][1][0] === i)) {
+          let currentMat = isomSeg2Seg(nextShape[match[j][1][1]],nextShape[match[j][1][2]],
+                                       atomPtList[match[j][0][0]][match[j][0][2]],
+                                       atomPtList[match[j][0][0]][match[j][0][1]]);
           for (let k = 0;k<nextShape.length;k++) {
             nextShape[k]=multMatVect(currentMat,nextShape[k]);
           } // end k loop
-          j = stepEdgeMaps.length; // find first match. Then stop.
+          j = match.length; // find first match. Then stop.
         } // end if
       } // end j loop
     } // end if i > 0
@@ -225,7 +225,7 @@ console.log(JSON.stringify(distNAng(nextShape)));
     atomPtList.push(nextShape);
   } // end atomList loop
 
-console.log(JSON.stringify(stepEdgeMaps));
+console.log(JSON.stringify(match));
 console.log("*");
 console.log(JSON.stringify(atomPtList));
 
@@ -242,15 +242,15 @@ console.log(JSON.stringify(atomPtList));
 
     // Choice A: does edge (currentVert, nextVert) connect to another atom?
     let foundJoin = false;
-    for (let j = 1 - firstInnerStepEdgeMap; j < stepEdgeMaps.length; j++) {
-      if (stepEdgeMaps[j].length < 2) continue;
+    for (let j = firstInnerMatch+1; j < match.length; j++) {
+      if (match[j].length < 2) continue;
       for (let matchIdx = 0; matchIdx <= 1; matchIdx++) {
-        if (stepEdgeMaps[j][matchIdx][0] === currentAtom &&
-            stepEdgeMaps[j][matchIdx][1] === currentVert &&
-            stepEdgeMaps[j][matchIdx][2] === nextVert) {
+        if (match[j][matchIdx][0] === currentAtom &&
+            match[j][matchIdx][1] === currentVert &&
+            match[j][matchIdx][2] === nextVert) {
           let otherIdx = 1 - matchIdx;
-          currentAtom = stepEdgeMaps[j][otherIdx][0];
-          currentVert = stepEdgeMaps[j][otherIdx][2]; // vertex coinciding with currentVert
+          currentAtom = match[j][otherIdx][0];
+          currentVert = match[j][otherIdx][2]; // vertex coinciding with currentVert
           foundJoin = true;
           break;
         }
@@ -592,15 +592,15 @@ function changeParams() {
 // For angles, we have a positive integer, telling how many repeats in 360 degrees.
 // Whenever we have ultra parallel lines instead of an angle, there is some distance between the lines. 
 // we call the segment of this length a step edge, since it is created during one of the steps.
-// We keep track of these edges with stepEdgeCount. We use negative integers to index which step edge we use.
+// We use stepEdgeCount to index which step edge we use. We store it as negative to mark it's a step edge.
 // We will have a length for all such edges and sometimes a twist.
 // It sets atomList and stepEdges
 function orbi2Atoms() {
 
   for (let i = 0; i<handle; i++) { // step 3: remove handle.
-    stepEdgeCount--;
-    newCone.push(stepEdgeCount);
-    newCone.push(stepEdgeCount);
+    stepEdgeCount++;
+    newCone.push(-stepEdgeCount);
+    newCone.push(-stepEdgeCount);
     stepEdges.push([3,2,0]); // step 3. length 2. twist 0.
   }
 
@@ -608,8 +608,8 @@ function orbi2Atoms() {
 
 //  alert(JSON.stringify([handle, crosscap, cone, kali]));
   for (let i = 0; i<crosscap; i++) { // step 2: remove crosscap. 
-    stepEdgeCount--;
-    newCone.push(stepEdgeCount);
+    stepEdgeCount++;
+    newCone.push(-stepEdgeCount);
     stepEdges.push([2,2]); // step 2, length 2
   }
 
@@ -630,16 +630,17 @@ function orbi2Atoms() {
     newKali = JSON.parse(JSON.stringify(kali[0]));
     if (kali.length > 1) { // step 1. Join kalis.
 
+// Claude: please check if this still works. 
       let minStepEdgeCount = stepEdgeCount;
       newKali = JSON.parse(JSON.stringify(kali[0]));
       for (let i=1;i<kali.length;i++) { 
-        stepEdgeCount--;
-        newKali.push(stepEdgeCount);
+        stepEdgeCount++;
+        newKali.push(-stepEdgeCount);
         stepEdges.push([1,2]); // step 1. length 2
         newKali.push(...kali[i]);
       } // end i loop through all kalis
-      for (let i=stepEdgeCount;i<minStepEdgeCount ;i++) { // add matching step edges
-        newKali.push(i);
+      for (let i=stepEdgeCount;i>minStepEdgeCount ;i--) { // add matching step edges
+        newKali.push(-i);
       }
     } // end step 1
 
@@ -648,8 +649,8 @@ function orbi2Atoms() {
     for (let i=0; i<newCone.length; i++) { // step 4. "2" cone and kali.
       if (newCone[i] === 2) { // remove cone. add corner.
         newCone.splice(i, 1);
-        stepEdgeCount--;
-        newKali.push(stepEdgeCount);
+        stepEdgeCount++;
+        newKali.push(-stepEdgeCount);
         stepEdges.push([4,2]); // step 4. length 2
         i--;
       }
@@ -659,15 +660,16 @@ function orbi2Atoms() {
 
     for (let i=0; i<newKali.length-1; i++) {   // step 6. "22" corners adjacent
       if ((newKali[i] === 2) && (newKali[i+1] === 2)) {
-        stepEdgeCount--;
-        newKali.splice(i, 2,stepEdgeCount);
+        stepEdgeCount++;
+        newKali.splice(i, 2, -stepEdgeCount);
         stepEdges.push([6,2]); // step 6. length 2
       } 
     } // end step 6
 
   //alert(JSON.stringify([6,newCone,newKali,stepEdges,atomList]));
 
-    firstInnerStepEdgeMap = stepEdgeCount;
+// Claude: please check this still works.
+    firstInnerMatch = stepEdgeCount;
     let pCaseName;
     if ((newCone.length === 1) && (newKali.length === 1)) { // just a pCase
       pCaseName = findPCase(newCone[0],newKali[0]);
@@ -678,10 +680,10 @@ function orbi2Atoms() {
           pCaseName = findPCase(newCone[i],newKali[0]);
           atomList.push([pCaseName,newCone[i],newKali[0]]);
         } else {
-          stepEdgeCount--;
-          pCaseName = findPCase(newCone[i],stepEdgeCount);
-          atomList.push([pCaseName,newCone[i],stepEdgeCount]);
-          newKali.push(stepEdgeCount);
+          stepEdgeCount++;
+          pCaseName = findPCase(newCone[i],-stepEdgeCount);
+          atomList.push([pCaseName,newCone[i],-stepEdgeCount]);
+          newKali.push(-stepEdgeCount);
           stepEdges.push([7,2]); // step 7. length 2
         }
       } // end step 7
@@ -694,10 +696,10 @@ function orbi2Atoms() {
       atomList.push(["S"+(3+newSheet[3]),newSheet[0],newSheet[1],newSheet[2]]);
     } else { // many corners
       for (let i=0; i<newKali.length-3; i++) { // step 9. (sheet)
-        stepEdgeCount--;
-        newSheet = rotList([Number(newKali[i]),Number(newKali[i+1]),Number(stepEdgeCount)]);
+        stepEdgeCount++;
+        newSheet = rotList([Number(newKali[i]),Number(newKali[i+1]),Number(-stepEdgeCount)]);
         atomList.push(["S"+(3+newSheet[3]),newSheet[0],newSheet[1],newSheet[2]]);
-        newKali.push(stepEdgeCount);
+        newKali.push(-stepEdgeCount);
         stepEdges.push([9,2]); // step 9. length 2
         i++;
         if (i === newKali.length-4) { // last sheet
@@ -713,8 +715,8 @@ function orbi2Atoms() {
     newCone = newCone.sort(function(a, b){return b-a});
     for (let i=0; i<newCone.length-1; i++) {  // step 5. two "2" cones
       if ((newCone[i] === 2) && (newCone[i+1] === 2)) {
-        stepEdgeCount--;
-        newCone.splice(i,2,stepEdgeCount);
+        stepEdgeCount++;
+        newCone.splice(i,2,-stepEdgeCount);
         stepEdges.push([5,2]); // step 5. length 2
       } 
     } // end step 5
@@ -731,16 +733,16 @@ function orbi2Atoms() {
 
   alert(JSON.stringify([5,newCone,newKali,stepEdges,atomList]));
 
-    firstInnerStepEdgeMap = stepEdgeCount;
+    firstInnerMatch = stepEdgeCount;
     if (newCone.length === 3) { // just one pillow
       newPillow = rotList([newCone[0],newCone[1],newCone[2]]);
       atomList.push(["P"+(3+newPillow[3]),newPillow[0],newPillow[1],newPillow[2]]);
     } else { // many cones
       for (let i=0; i<newCone.length-3; i++) {  // step 8. (pillow) remember twist.
-        stepEdgeCount--;
-        newPillow = rotList([newCone[i],newCone[i+1],stepEdgeCount]);
+        stepEdgeCount++;
+        newPillow = rotList([newCone[i],newCone[i+1],-stepEdgeCount]);
         atomList.push(["P"+(3+newPillow[3]),newPillow[0],newPillow[1],newPillow[2]]);
-        newCone.push(stepEdgeCount);
+        newCone.push(-stepEdgeCount);
         stepEdges.push([8,2,0]); // step 8. length 2. twist 0.
         i++;
         if (i === newCone.length-4) { // last pillow
