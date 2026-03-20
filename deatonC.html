@@ -42,7 +42,7 @@ Crosscaps
 <input type="number" id="crosscap"value = "0" style="width: 120px" onchange="reDo()"></input>
 <br>
 Cones
-<input type="text" id="cone" value = "[7,3,4]" style="width: 120px" onchange="reDo()"></input>
+<input type="text" id="cone" value = "[7,3,4,5]" style="width: 120px" onchange="reDo()"></input>
 <br>
 Kalis
 <input type="text" id="kali" value = "[]" style="width: 120px" onchange="reDo()"></input>
@@ -57,22 +57,20 @@ Kalis
 <img src="resources/redo.png" alt="Redo" onclick="goRedo()" title="Redo"></img>
 </center>
 
-<!--
-<div style="float:left">
-<label for="edit">
-<img src="resources/arrow.png" alt="Arrow" title="edit shapes" style="border: 1px solid black"></img>
-</label>
-<br>
-<input type="radio" id="edit" name="mode" onchange="setMode(0)" value="edit">
-</div>
--->
-
 <div style="float:left">
 <label for="pan">
 <img src="resources/pan.png" alt="hand" title="pan" style="border: 1px solid black"></img>
 </label>
 <br>
 <input type="radio" id="pan" name="mode" onchange="setMode(-1)" value="pan">
+</div>
+
+<div style="float:left">
+<label for="edit">
+<img src="resources/arrow.png" alt="arrow" title="edit" style="border: 1px solid black"></img>
+</label>
+<br>
+<input type="radio" id="edit" name="mode" onchange="setMode(0)" value="edit">
 </div>
 
 <div style="float:left">

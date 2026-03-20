@@ -29,6 +29,11 @@ var epsilon = 0.0000001;
 var hZoom = 1;
 
 let atomPtList;
+// borderFD[i] = [atomIdx, vertIdx] — structural boundary of the fundamental domain.
+// Step-8 join vertices appear as two consecutive entries (coincide when twist is 0).
+let borderFD;
+// originFD[i] = WC point — geometric boundary of the fundamental domain.
+let originFD;
 
 
 function init() {
@@ -71,7 +76,9 @@ function reDo() {
   atomList.reverse(); // start with the most connections
 
   buildMatch();
+  buildBorderFD();
   buildAtomPtList();
+  buildOriginFD();
 
   console.log(JSON.stringify([handle, crosscap, cone, kali]));
   console.log("atomList: " + JSON.stringify(atomList));
@@ -316,6 +323,57 @@ function buildMatch() {
 }
 
 
+// Traces the boundary of the fundamental domain structurally.
+// Structural — call after buildMatch().
+// Each entry is [atomIdx, vertIdx]. Step-8 join vertices appear as two consecutive
+// entries (one per atom side) — they coincide geometrically when twist is 0.
+function buildBorderFD() {
+  let currentAtom = 0;
+  let currentVert = 0;
+  borderFD = [];
+  let pendingPartner = null; // [atomIdx, vertIdx] from entry side of a step-8 join
+  for (let iter = 0; iter < 10000; iter++) {
+    let nVerts = nVertsForAtom(atomList[currentAtom][0]);
+    let nextVert = (currentVert + 1) % nVerts;
+    let foundJoin = false;
+    for (let j = firstInnerMatch + 1; j < match.length; j++) {
+      if (match[j].length < 2) continue;
+      for (let matchIdx = 0; matchIdx <= 1; matchIdx++) {
+        if (match[j][matchIdx][0] === currentAtom &&
+            match[j][matchIdx][1] === currentVert) {
+          let otherIdx = 1 - matchIdx;
+          let otherAtom = match[j][otherIdx][0];
+          let otherNVerts = nVertsForAtom(atomList[otherAtom][0]);
+          if (stepEdges[j] === 8) {
+            pendingPartner = [currentAtom, currentVert];
+          }
+          currentAtom = otherAtom;
+          currentVert = (match[j][otherIdx][1] + 1) % otherNVerts;
+          foundJoin = true;
+          break;
+        }
+      }
+      if (foundJoin) break;
+    }
+    if (!foundJoin) {
+      if (pendingPartner !== null) {
+        borderFD.push(pendingPartner);
+        pendingPartner = null;
+      }
+      borderFD.push([currentAtom, currentVert]);
+      currentVert = nextVert;
+    }
+    if (currentAtom === 0 && currentVert === 0) break;
+  }
+}
+
+
+// Converts borderFD[] to geometric coordinates. Call after buildAtomPtList().
+function buildOriginFD() {
+  originFD = borderFD.map(([atom, vert]) => atomPtList[atom][vert]);
+}
+
+
 // ── Math utilities ────────────────────────────────────────────────────────────
 
 function hDot(P, Q) { return -P[0]*Q[0] + P[1]*Q[1] + P[2]*Q[2]; }
@@ -450,8 +508,17 @@ function transMat(P, Q) {
   return multMatMat(pRefl, multMatMat(trans1, pRefl));
 }
 
-function isomSeg2Seg(P, Q, R, S) {
+function isomSeg2Seg(P, Q, R, S, twist=0) {
   if (Math.abs(normHDot(P,Q) - normHDot(R,S)) >= epsilon) return "Error. Don't match!";
+  if (twist !== 0) {
+    let d = hDist(R, S);
+    let V = scalarVect(1/Math.sinh(d), vectMinus(S, scalarVect(Math.cosh(d), R)));
+    let td = twist * d;
+    let Rprime = vectPlus(scalarVect(Math.cosh(td),     R), scalarVect(Math.sinh(td),     V));
+    let Sprime = vectPlus(scalarVect(Math.cosh(td + d), R), scalarVect(Math.sinh(td + d), V));
+    R = Rprime;
+    S = Sprime;
+  }
   let reflMat1, reflMat2;
   if (hDist(P, R) < epsilon) {
     if (hDist(Q, S) < epsilon) return [[1,0,0],[0,1,0],[0,0,1]];
@@ -675,9 +742,11 @@ function buildAtomPtList() {
 
       // Map new edge (newStart→newEnd) onto anchor edge (anchorEnd→anchorStart).
       // Reversed because adjacent edges are traversed in opposite orientations.
+      let twist = params[j][1] ?? 0;
       let mat = isomSeg2Seg(
         nextShape[newStart], nextShape[newEnd],
-        atomPtList[anchorAtomIdx][anchorEnd], atomPtList[anchorAtomIdx][anchorStart]
+        atomPtList[anchorAtomIdx][anchorEnd], atomPtList[anchorAtomIdx][anchorStart],
+        twist
       );
       nextShape = nextShape.map(v => multMatVect(mat, v));
     }
@@ -740,6 +809,18 @@ function draw() {
   context.strokeStyle = "black";
   context.stroke();
   context.closePath();
+
+  // draw fundamental domain boundary
+  if (originFD && originFD.length > 0) {
+    let verts = polyMoreVert(originFD).map(p => pt2Screen(p, hZoom));
+    context.beginPath();
+    context.moveTo(verts[verts.length-1][0], verts[verts.length-1][1]);
+    verts.forEach(v => context.lineTo(v[0], v[1]));
+    context.strokeStyle = "darkgrey";
+    context.lineWidth = 2;
+    context.stroke();
+    context.closePath();
+  }
 
   // draw atoms
   if (atomPtList) {
