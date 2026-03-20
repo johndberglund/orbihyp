@@ -1,40 +1,35 @@
-let handle;
-let crosscap;
-let cone;
-let kali;
-
-let newCone = [];
-let newKali = [];
-let atomList = [];
-let newSheet = [];
-let newPillow = [];
-let firstInnerMatch;
-
-let stepEdgeCount;
-// stepEdges[i] is just the step number, e.g. [0, 3, 4, 4, 6, 7, 7, 7, 7]
-let stepEdges;
-// params[i] holds the length (and twist if step 3 or 8), e.g. [0, [2,0], [2], [2], ...]
-let params;
-// match[i] = list of [atomIndex, startVert] for each atom that has step edge i.
-// Structural: only changes when orbifold changes.
-let match;
-// glueMatch[i] = step edge index used to position atom i against a previously placed atom.
-// Atom 0 is the anchor. Structural: only changes when orbifold changes.
-let glueMatch;
-
 var scrRadius = 200;
 var scrCenterX;
 var scrCenterY;
 var epsilon = 0.0000001;
 var hZoom = 1;
 
-let atomPtList;
+// sturctural variables: only change when orbifold changes
+// atomList[i] = [type, param1, param2, ...] e.g. ["C4", 3, 4] or ["S5", 2, 3, 4] or ["P6", 2, 3, 4]
+let atomList = [];
+let firstInnerMatch;
+// stepEdges[i] is just the step number, e.g. [0, 3, 4, 4, 6, 7, 7, 7, 7]
+let stepEdges;
+// match[i] = list of [atomIndex, startVert] for each atom that has step edge i.
+let match;
+// glueMatch[i] = step edge index used to position atom i against a previously placed atom.
+// Atom 0 is the anchor.
+let glueMatch;
 // borderFD[i] = [atomIdx, vertIdx] — structural boundary of the fundamental domain.
 // Step-8 join vertices appear as two consecutive entries (coincide when twist is 0).
 let borderFD;
+// genMaps[i] = [j, orientation] — edge i of the FD boundary maps to edge j.
+// orientation: 1 = direct, 0 = flipped, -1 = step edge (treated separately).
+// Edge i runs from borderFD[i] to borderFD[(i+1) % borderFD.length].
+let genMaps;
+
+// geometric variables.
+// params[i] holds the length (and twist if step 3 or 8), e.g. [0, [2,0], [2], [2], ...]
+let params;
+// atomPtList[i] = list of geometric coordinates for the vertices of atom i, in the same order as the atom definition.
+let atomPtList;
 // originFD[i] = WC point — geometric boundary of the fundamental domain.
 let originFD;
-
 
 function init() {
   var c = document.getElementById("myCanvas");
@@ -60,19 +55,16 @@ function init() {
 
 
 function reDo() {
-  handle = Number(document.getElementById("handle").value);
-  crosscap = Number(document.getElementById("crosscap").value);
-  cone = JSON.parse(document.getElementById("cone").value);
-  kali = JSON.parse(document.getElementById("kali").value);
+  let handle = Number(document.getElementById("handle").value);
+  let crosscap = Number(document.getElementById("crosscap").value);
+  let cone = JSON.parse(document.getElementById("cone").value);
+  let kali = JSON.parse(document.getElementById("kali").value);
 
-  stepEdgeCount = 0;
   stepEdges = [0];
   params = [0];
-  newCone = JSON.parse(JSON.stringify(cone));
-  newKali = [];
   atomList = [];
 
-  orbi2Atoms();
+  orbi2Atoms(handle, crosscap, cone, kali);
   atomList.reverse(); // start with the most connections
 
   buildMatch();
@@ -86,13 +78,18 @@ function reDo() {
   console.log("params: " + JSON.stringify(params));
   console.log("match: " + JSON.stringify(match));
   console.log("glueMatch: " + JSON.stringify(glueMatch));
+  console.log("genMaps: " + JSON.stringify(genMaps));
   console.log("atomPtList: " + JSON.stringify(atomPtList));
 
   draw();
 }
 
 
-function orbi2Atoms() {
+function orbi2Atoms(handle, crosscap, cone, kali) {
+  let stepEdgeCount = 0;
+  let newCone = JSON.parse(JSON.stringify(cone));
+  let newKali = [];
+  let newSheet, newPillow;
 
   for (let i = 0; i < handle; i++) { // step 3: remove handle.
     stepEdgeCount++;
@@ -323,15 +320,108 @@ function buildMatch() {
 }
 
 
-// Traces the boundary of the fundamental domain structurally.
+// Returns [mappedVertIdx, isDirect] for edges that map to another edge of the same atom,
+// or -1 for outer step edges (whose gluing is determined by the orbifold rules).
+// Reflection edges map to themselves with isDirect = false.
+function atomEdge(atomType, vertNum) {
+  switch (atomType) {
+    case "S3":
+      return [vertNum, false]; // all three edges are reflections
+    case "S4":
+      if (vertNum === 0) return -1; // step edge
+      return [vertNum, false];
+    case "S5":
+      if (vertNum === 0 || vertNum === 2) return -1; // step edges
+      return [vertNum, false];
+    case "S6":
+      if (vertNum === 0 || vertNum === 2 || vertNum === 4) return -1; // step edges
+      return [vertNum, false];
+    case "C3":
+      if (vertNum === 0) return [2, true];
+      if (vertNum === 1) return [1, false]; // reflection
+      if (vertNum === 2) return [0, true];
+      break;
+    case "C4":
+      if (vertNum === 0) return [2, true];
+      if (vertNum === 1) return -1; // crosscap step edge
+      if (vertNum === 2) return [0, true];
+      if (vertNum === 3) return [3, false]; // reflection
+      break;
+    case "C5":
+      if (vertNum === 0) return [0, false]; // reflection
+      if (vertNum === 1) return -1; // step edge
+      if (vertNum === 2) return [2, false]; // reflection
+      if (vertNum === 3) return [4, true];
+      if (vertNum === 4) return [3, true];
+      break;
+    case "C6":
+      if (vertNum === 0) return [0, false]; // reflection
+      if (vertNum === 1) return -1; // step edge
+      if (vertNum === 2) return [2, false]; // reflection
+      if (vertNum === 3) return [5, true];
+      if (vertNum === 4) return -1; // step edge
+      if (vertNum === 5) return [3, true];
+      break;
+    case "P3":
+      if (vertNum === 0) return [5, true];
+      if (vertNum === 1) return [2, true];
+      if (vertNum === 2) return [1, true];
+      if (vertNum === 3) return [4, true];
+      if (vertNum === 4) return [3, true];
+      if (vertNum === 5) return [0, true];
+      break;
+    case "P4":
+      if (vertNum === 0) return -1; // step edge
+      if (vertNum === 1) return [6, true];
+      if (vertNum === 2) return [3, true];
+      if (vertNum === 3) return [2, true];
+      if (vertNum === 4) return [5, true];
+      if (vertNum === 5) return [4, true];
+      if (vertNum === 6) return [1, true];
+      break;
+    case "P5":
+      if (vertNum === 0) return -1; // step edge
+      if (vertNum === 1) return [7, true];
+      if (vertNum === 2) return [4, true];
+      if (vertNum === 3) return -1; // step edge
+      if (vertNum === 4) return [2, true];
+      if (vertNum === 5) return [6, true];
+      if (vertNum === 6) return [5, true];
+      if (vertNum === 7) return [1, true];
+      break;
+    case "P6":
+      if (vertNum === 0) return -1; // step edge
+      if (vertNum === 1) return [8, true];
+      if (vertNum === 2) return [4, true];
+      if (vertNum === 3) return -1; // step edge
+      if (vertNum === 4) return [2, true];
+      if (vertNum === 5) return [7, true];
+      if (vertNum === 6) return -1; // step edge
+      if (vertNum === 7) return [5, true];
+      if (vertNum === 8) return [1, true];
+      break;
+    default:
+      return -1;
+  }
+}
+
+
+// Traces the boundary of the fundamental domain and builds genMaps[].
 // Structural — call after buildMatch().
-// Each entry is [atomIdx, vertIdx]. Step-8 join vertices appear as two consecutive
+// borderFD[i] = [atomIdx, vertIdx]. Step-8 join vertices appear as two consecutive
 // entries (one per atom side) — they coincide geometrically when twist is 0.
+// genMaps[i] = [j, orientation]: edge i maps to edge j.
+// orientation: 1 = direct, 0 = flipped, -1 = step edge, null = twist edge (no mapping).
 function buildBorderFD() {
   let currentAtom = 0;
   let currentVert = 0;
   borderFD = [];
-  let pendingPartner = null; // [atomIdx, vertIdx] from entry side of a step-8 join
+  genMaps = [];
+  let pendingPartner = null;
+  let twistIndices = new Set();
+  let lookup = new Map(); // "atomIdx,vertIdx" → borderFD index
+
+  // Pass 1: build borderFD and lookup map
   for (let iter = 0; iter < 10000; iter++) {
     let nVerts = nVertsForAtom(atomList[currentAtom][0]);
     let nextVert = (currentVert + 1) % nVerts;
@@ -357,13 +447,45 @@ function buildBorderFD() {
     }
     if (!foundJoin) {
       if (pendingPartner !== null) {
+        twistIndices.add(borderFD.length);
+        lookup.set(pendingPartner[0] + "," + pendingPartner[1], borderFD.length);
         borderFD.push(pendingPartner);
         pendingPartner = null;
       }
+      lookup.set(currentAtom + "," + currentVert, borderFD.length);
       borderFD.push([currentAtom, currentVert]);
       currentVert = nextVert;
     }
     if (currentAtom === 0 && currentVert === 0) break;
+  }
+
+  // Pass 2: build genMaps
+  for (let i = 0; i < borderFD.length; i++) {
+    if (twistIndices.has(i)) {
+      genMaps.push(null);
+      continue;
+    }
+    let [atomIdx, vertIdx] = borderFD[i];
+    let result = atomEdge(atomList[atomIdx][0], vertIdx);
+    if (result === -1) {
+      // outer step edge: find partner in borderFD via match
+      let found = false;
+      for (let j = 1; j <= firstInnerMatch && !found; j++) {
+        if (match[j].length < 2) continue;
+        for (let side = 0; side <= 1; side++) {
+          if (match[j][side][0] === atomIdx && match[j][side][1] === vertIdx) {
+            let other = match[j][1 - side];
+            genMaps.push([lookup.get(other[0] + "," + other[1]), -1]);
+            found = true;
+            break;
+          }
+        }
+      }
+      if (!found) genMaps.push([-1, -1]); // shouldn't happen
+    } else {
+      let [mappedVert, isDirect] = result;
+      genMaps.push([lookup.get(atomIdx + "," + mappedVert), isDirect ? 1 : 0]);
+    }
   }
 }
 
