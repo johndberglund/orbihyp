@@ -22,6 +22,15 @@ let borderFD;
 // orientation: 1 = direct, 0 = flipped, -1 = step edge (treated separately).
 // Edge i runs from borderFD[i] to borderFD[(i+1) % borderFD.length].
 let genMaps;
+// indexedCents[i] compares allMappedCents[]. stores index of first instance
+let indexedCents;
+// uniqGens[i] = unique indices in indexedCents[]
+let uniqGens;
+// coords2Drop[i] = index of borderFD[] to drop. (if adjacent edges have same indexdCents[])
+let coords2Drop;
+// neighborMaps[i] = indexed by genMats[] of which isometries are composed. 
+// offset from neighborMats[] by one, since it doesn't include the identity.
+let neighborMaps;
 
 // geometric variables.
 // params[i] holds the length (and twist if step 3 or 8), e.g. [0, [2,0], [2], [2], ...]
@@ -30,6 +39,24 @@ let params;
 let atomPtList;
 // originFD[i] = WC point — geometric boundary of the fundamental domain.
 let originFD;
+let originFDCent;
+// recenterMat = matrix to translate originFDCent to [1,0,0]
+let recenterMat;
+// paramPtList[i] = endpoints of each edge in match[] in lowest atom. also twist.
+let paramPtList;
+// allGenMats[i] = matrices of genMaps[]. Duplicates allowed.
+let allGenMats;
+// allMappedCents[i] = move originFDCent by allGenMats[]
+let allMappedCents;
+// genMats[i] = The matrices in allGenMats[] in uniqGens[]
+let genMats;
+// neighborCents[i] = Start with origin. Then allMappedCents[] in uniqGens[].
+// then more centers of composed isometries.
+let neighborCents;
+// neighborMats[i] = Matrices. start with the identity. Then genMats[].
+// then more matrices of composed isometries. Matches neighborCents[].
+let neighborMats;
+
 
 function init() {
   var c = document.getElementById("myCanvas");
@@ -70,7 +97,21 @@ function reDo() {
   buildMatch();
   buildBorderFD();
   buildAtomPtList();
+  buildParamPtList();
   buildOriginFD();
+  buildOriginFDCent();
+  recenterMat = transMat(originFDCent, [1, 0, 0]);
+  originFD = originFD.map(p => multMatVect(recenterMat, p));
+  originFDCent = multMatVect(recenterMat, originFDCent);
+  for (let j = 1; j < paramPtList.length; j++) {
+    if (paramPtList[j] === null) continue;
+    paramPtList[j] = [
+      multMatVect(recenterMat, paramPtList[j][0]),
+      multMatVect(recenterMat, paramPtList[j][1]),
+      paramPtList[j][2]
+    ];
+  }
+  buildAllGenMats();
 
   console.log(JSON.stringify([handle, crosscap, cone, kali]));
   console.log("atomList: " + JSON.stringify(atomList));
@@ -80,6 +121,7 @@ function reDo() {
   console.log("glueMatch: " + JSON.stringify(glueMatch));
   console.log("genMaps: " + JSON.stringify(genMaps));
   console.log("atomPtList: " + JSON.stringify(atomPtList));
+  console.log("originFD: " + JSON.stringify(originFD));
 
   draw();
 }
@@ -471,13 +513,20 @@ function buildBorderFD() {
       // outer step edge: find partner in borderFD via match
       let found = false;
       for (let j = 1; j <= firstInnerMatch && !found; j++) {
-        if (match[j].length < 2) continue;
-        for (let side = 0; side <= 1; side++) {
-          if (match[j][side][0] === atomIdx && match[j][side][1] === vertIdx) {
-            let other = match[j][1 - side];
-            genMaps.push([lookup.get(other[0] + "," + other[1]), -1]);
+        if (!match[j] || match[j].length === 0) continue;
+        if (match[j].length === 1) { // crosscap: edge glued to itself reversed
+          if (match[j][0][0] === atomIdx && match[j][0][1] === vertIdx) {
+            genMaps.push([i, -1]);
             found = true;
-            break;
+          }
+        } else {
+          for (let side = 0; side <= 1; side++) {
+            if (match[j][side][0] === atomIdx && match[j][side][1] === vertIdx) {
+              let other = match[j][1 - side];
+              genMaps.push([lookup.get(other[0] + "," + other[1]), -1]);
+              found = true;
+              break;
+            }
           }
         }
       }
@@ -490,9 +539,97 @@ function buildBorderFD() {
 }
 
 
+// Builds allGenMats[] — one isometry matrix per edge of originFD[].
+// allGenMats[i] maps the FD across edge i to the adjacent copy.
+// Null where genMaps[i] is null (twist edge).
+function buildAllGenMats() {
+  let n = originFD.length;
+  allGenMats = [];
+  for (let i = 0; i < n; i++) {
+    if (genMaps[i] === null) { allGenMats.push(null); continue; }
+    let [j, orient] = genMaps[i];
+    let Pi = originFD[i], Qi = originFD[(i + 1) % n];
+
+    if (orient === 0) {
+      // kaleidoscope reflection over geodesic of edge i
+      allGenMats.push(hReflMat(points2Line(Pi, Qi)));
+      continue;
+    }
+
+    if (orient === 1) {
+      // direct gluing (pillow/sheet/pcase internal symmetry)
+      let Pj = originFD[j], Qj = originFD[(j + 1) % n];
+      allGenMats.push(isomSeg2Seg(Pi, Qi, Qj, Pj));
+      continue;
+    }
+
+    // orient === -1: outer step edge — find step type
+    let stepType = 0, twist = 0;
+    let [atomIdx, vertIdx] = borderFD[i];
+    for (let k = 1; k <= firstInnerMatch; k++) {
+      if (!match[k] || match[k].length === 0) continue;
+      let found = false;
+      for (let side = 0; side < match[k].length; side++) {
+        if (match[k][side][0] === atomIdx && match[k][side][1] === vertIdx) {
+          stepType = stepEdges[k];
+          twist = paramPtList[k] ? paramPtList[k][2] : 0;
+          found = true;
+          break;
+        }
+      }
+      if (found) break;
+    }
+
+    if (j !== i) {
+      // steps 1, 3: map to partner edge (reversed by FD traversal convention)
+      let Pj = originFD[j], Qj = originFD[(j + 1) % n];
+      allGenMats.push(isomSeg2Seg(Pi, Qi, Qj, Pj, twist)); // twist=0 for step 1
+    } else {
+      // self-mapping step edges (steps 2, 4, 5, 6)
+      switch (stepType) {
+        case 4: case 5:
+          allGenMats.push(isomSeg2Seg(Pi, Qi, Qi, Pi));
+          break;
+        case 6:
+          allGenMats.push(hReflMat(points2Line(Pi, Qi)));
+          break;
+        case 2: {
+          let mid1 = midPoint(Pi, Qi);
+          allGenMats.push(isomSeg2SegFlip(Pi, mid1, mid1, Qi));
+          break;
+        }
+        default:
+          allGenMats.push(null);
+      }
+    }
+  }
+}
+
+
 // Converts borderFD[] to geometric coordinates. Call after buildAtomPtList().
 function buildOriginFD() {
   originFD = borderFD.map(([atom, vert]) => atomPtList[atom][vert]);
+}
+
+
+// Finds the area centroid of originFD[]. Call after buildOriginFD().
+// Triangulates (fan from vertex 0), weights triangle centroids by hyperbolic area.
+function buildOriginFDCent() {
+  let n = originFD.length;
+  if (n < 3) { originFDCent = originFD[0]; return; }
+  let A = originFD[0];
+  let totalArea = 0, cx = 0, cy = 0, cz = 0;
+  for (let i = 1; i < n - 1; i++) {
+    let B = originFD[i], C = originFD[i + 1];
+    let area = hTriangleArea(A, B, C);
+    if (!isFinite(area) || area < epsilon) continue;
+    let triCent = hNorm(vectPlus(vectPlus(A, B), C));
+    cx += area * triCent[0];
+    cy += area * triCent[1];
+    cz += area * triCent[2];
+    totalArea += area;
+  }
+  originFDCent = hNorm([cx / totalArea, cy / totalArea, cz / totalArea]);
 }
 
 
@@ -630,6 +767,13 @@ function transMat(P, Q) {
   return multMatMat(pRefl, multMatMat(trans1, pRefl));
 }
 
+// Orientation-reversing isometry mapping segment P→Q to segment R→S.
+// Composed as hReflMat(geodesic RS) * isomSeg2Seg(P,Q,R,S).
+function isomSeg2SegFlip(P, Q, R, S) {
+  return multMatMat(hReflMat(points2Line(R, S)), isomSeg2Seg(P, Q, R, S));
+}
+
+
 function isomSeg2Seg(P, Q, R, S, twist=0) {
   if (Math.abs(normHDot(P,Q) - normHDot(R,S)) >= epsilon) return "Error. Don't match!";
   if (twist !== 0) {
@@ -655,6 +799,17 @@ function isomSeg2Seg(P, Q, R, S, twist=0) {
     : hReflMat(vectMinus(S, QPrime));
   return multMatMat(reflMat2, reflMat1);
 }
+
+function hTriangleArea(A, B, C) {
+  let ab = hDot(A, B), ac = hDot(A, C), bc = hDot(B, C);
+  let cosA = (ab*ac - bc) / (Math.sqrt(ab*ab - 1) * Math.sqrt(ac*ac - 1));
+  let cosB = (ab*bc - ac) / (Math.sqrt(ab*ab - 1) * Math.sqrt(bc*bc - 1));
+  let cosC = (ac*bc - ab) / (Math.sqrt(ac*ac - 1) * Math.sqrt(bc*bc - 1));
+  return Math.PI - Math.acos(Math.max(-1, Math.min(1, cosA)))
+                 - Math.acos(Math.max(-1, Math.min(1, cosB)))
+                 - Math.acos(Math.max(-1, Math.min(1, cosC)));
+}
+
 
 // ── Triangle solvers ──────────────────────────────────────────────────────────
 
@@ -830,6 +985,24 @@ function nVertsForAtom(type) {
   return n;                          // S3→3...S6→6, C3→3...C6→6
 }
 
+// Builds paramPtList[] from match[], atomPtList[], params[].
+// paramPtList[i] = [P, Q, twist] — endpoints and twist of step edge i,
+// taken from the lower-indexed atom. Indexed like match[] (entry 0 unused).
+function buildParamPtList() {
+  paramPtList = [0];
+  for (let j = 1; j < match.length; j++) {
+    if (match[j].length < 2) { paramPtList.push(null); continue; }
+    let entry = match[j][0][0] <= match[j][1][0] ? match[j][0] : match[j][1];
+    let atomIdx = entry[0], startVert = entry[1];
+    let nVerts = nVertsForAtom(atomList[atomIdx][0]);
+    let P = atomPtList[atomIdx][startVert];
+    let Q = atomPtList[atomIdx][(startVert + 1) % nVerts];
+    let twist = params[j][1] ?? 0;
+    paramPtList.push([P, Q, twist]);
+  }
+}
+
+
 // Builds atomPtList[] from atomList[], params[], glueMatch[], match[].
 // Geometric: call whenever params change (also called from reDo for initial build).
 function buildAtomPtList() {
@@ -938,23 +1111,86 @@ function draw() {
     context.beginPath();
     context.moveTo(verts[verts.length-1][0], verts[verts.length-1][1]);
     verts.forEach(v => context.lineTo(v[0], v[1]));
+    context.closePath();
+    context.fillStyle = "beige";
+    context.fill();
     context.strokeStyle = "darkgrey";
     context.lineWidth = 2;
     context.stroke();
-    context.closePath();
   }
 
-  // draw atoms
-  if (atomPtList) {
-    for (let i = 0; i < atomPtList.length; i++) {
-      let verts = polyMoreVert(atomPtList[i]).map(p => pt2Screen(p, hZoom));
+  // TEMP: draw originFD transformed by each allGenMats entry
+  if (allGenMats && originFD && originFD.length > 0) {
+    let seenCenters = [];
+    for (let i = 0; i < allGenMats.length; i++) {
+      if (!allGenMats[i]) continue;
+      let cent = multMatVect(allGenMats[i], originFDCent);
+      if (seenCenters.some(c => hDist(c, cent) < 0.1)) continue;
+      seenCenters.push(cent);
+      let transformed = originFD.map(p => multMatVect(allGenMats[i], p));
+      let verts = polyMoreVert(transformed).map(p => pt2Screen(p, hZoom));
       context.beginPath();
       context.moveTo(verts[verts.length-1][0], verts[verts.length-1][1]);
       verts.forEach(v => context.lineTo(v[0], v[1]));
-      context.strokeStyle = "lightgrey";
+      context.strokeStyle = "red";
       context.lineWidth = 1;
       context.stroke();
       context.closePath();
     }
   }
+
+  // draw paramPtList segments
+  if (paramPtList) {
+    for (let j = 1; j < paramPtList.length; j++) {
+      if (!paramPtList[j]) continue;
+      let [P, Q, twist] = paramPtList[j];
+
+      // segment
+      let seg = divSeg(P, Q, 5).map(p => pt2Screen(p, hZoom));
+      context.beginPath();
+      context.moveTo(seg[0][0], seg[0][1]);
+      for (let k = 1; k < seg.length; k++) context.lineTo(seg[k][0], seg[k][1]);
+      context.strokeStyle = "green";
+      context.lineWidth = 1.5;
+      context.stroke();
+      context.closePath();
+
+      // endpoint markers
+      for (let pt of [P, Q]) {
+        let s = pt2Screen(pt, hZoom);
+        context.beginPath();
+        context.arc(s[0], s[1], 4, 0, 2 * Math.PI);
+        context.fillStyle = "green";
+        context.fill();
+        context.closePath();
+      }
+
+      // twist marker (diamond) — only for step types 3 and 8
+      if (stepEdges[j] === 3 || stepEdges[j] === 8) {
+        let t = Math.max(0, Math.min(1, twist));
+        let twistPt = hNorm(vectPlus(scalarVect(1 - t, P), scalarVect(t, Q)));
+        let s = pt2Screen(twistPt, hZoom);
+        let r = 6;
+        context.beginPath();
+        context.moveTo(s[0],     s[1] - r);
+        context.lineTo(s[0] + r, s[1]    );
+        context.lineTo(s[0],     s[1] + r);
+        context.lineTo(s[0] - r, s[1]    );
+        context.closePath();
+        context.fillStyle = "orange";
+        context.fill();
+      }
+    }
+  }
+
+  // draw FD center
+  if (originFDCent) {
+    let ctr = pt2Screen(originFDCent, hZoom);
+    context.beginPath();
+    context.arc(ctr[0], ctr[1], 4, 0, 2 * Math.PI);
+    context.fillStyle = "blue";
+    context.fill();
+    context.closePath();
+  }
+
 }
