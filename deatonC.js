@@ -26,7 +26,7 @@ let genMaps;
 let indexedCents;
 // uniqGens[i] = unique indices in indexedCents[]
 let uniqGens;
-// coords2Drop[i] = index of borderFD[] to drop. (if adjacent edges have same indexdCents[])
+// coords2Drop[i] = index of borderFD[] to drop. (if adjacent edges have same indexedCents[])
 let coords2Drop;
 // neighborMaps[i] = indexed by genMats[] of which isometries are composed. 
 // offset from neighborMats[] by one, since it doesn't include the identity.
@@ -111,7 +111,9 @@ function reDo() {
       paramPtList[j][2]
     ];
   }
+  atomPtList = atomPtList.map(atom => atom.map(p => multMatVect(recenterMat, p)));
   buildAllGenMats();
+  buildAllMappedCents();
 
   console.log(JSON.stringify([handle, crosscap, cone, kali]));
   console.log("atomList: " + JSON.stringify(atomList));
@@ -122,6 +124,7 @@ function reDo() {
   console.log("genMaps: " + JSON.stringify(genMaps));
   console.log("atomPtList: " + JSON.stringify(atomPtList));
   console.log("originFD: " + JSON.stringify(originFD));
+  console.log("allMappedCents: " + JSON.stringify(allMappedCents));
 
   draw();
 }
@@ -183,9 +186,9 @@ function orbi2Atoms(handle, crosscap, cone, kali) {
         stepEdgeCount++;
         newKali.push(-stepEdgeCount);
         stepEdges.push(4);
-        params.push([2]); // length 2
         i--;
       }
+      params.push([2]); // length 2
     }
 
     for (let i = 0; i < newKali.length - 1; i++) { // step 6: "22" corners adjacent.
@@ -596,12 +599,26 @@ function buildAllGenMats() {
         case 2: {
           let mid1 = midPoint(Pi, Qi);
           allGenMats.push(isomSeg2SegFlip(Pi, mid1, mid1, Qi));
+          allGenMats.push(isomSeg2SegFlip(Qi, mid1, mid1, Pi));
           break;
         }
         default:
           allGenMats.push(null);
       }
     }
+  }
+}
+
+
+function buildAllMappedCents() {
+  allMappedCents = allGenMats.map(mat => {
+    if (mat === null) return null;
+    let cent = multMatVect(mat, originFDCent);
+    return hDist(cent, originFDCent) < 0.1 ? null : cent;
+  });
+  // filter out allGenMats entries whose center maps back to origin
+  for (let i = 0; i < allGenMats.length; i++) {
+    if (allMappedCents[i] === null) allGenMats[i] = null;
   }
 }
 
@@ -1105,15 +1122,29 @@ function draw() {
   context.stroke();
   context.closePath();
 
+  // draw atoms in atomPtList
+  if (atomPtList) {
+    let atomColors = ["#d0e8ff", "#d0ffd8", "#fff0d0", "#f0d0ff", "#ffd0d0", "#d0ffff"];
+    for (let a = 0; a < atomPtList.length; a++) {
+      let verts = polyMoreVert(atomPtList[a]).map(p => pt2Screen(p, hZoom));
+      context.beginPath();
+      context.moveTo(verts[verts.length-1][0], verts[verts.length-1][1]);
+      verts.forEach(v => context.lineTo(v[0], v[1]));
+      context.closePath();
+      context.fillStyle = atomColors[a % atomColors.length];
+      context.fill();
+      context.strokeStyle = "steelblue";
+      context.lineWidth = 1;
+      context.stroke();
+    }
+  }
+
   // draw fundamental domain boundary
   if (originFD && originFD.length > 0) {
     let verts = polyMoreVert(originFD).map(p => pt2Screen(p, hZoom));
     context.beginPath();
     context.moveTo(verts[verts.length-1][0], verts[verts.length-1][1]);
     verts.forEach(v => context.lineTo(v[0], v[1]));
-    context.closePath();
-    context.fillStyle = "beige";
-    context.fill();
     context.strokeStyle = "darkgrey";
     context.lineWidth = 2;
     context.stroke();
@@ -1191,6 +1222,19 @@ function draw() {
     context.fillStyle = "blue";
     context.fill();
     context.closePath();
+  }
+
+  // draw centers for each isometry in allMappedCents[]
+  if (allMappedCents) {
+    for (let i = 0; i < allMappedCents.length; i++) {
+      if (allMappedCents[i] === null) continue;
+      let ctr = pt2Screen(allMappedCents[i], hZoom);
+      context.beginPath();
+      context.arc(ctr[0], ctr[1], 3, 0, 2 * Math.PI);
+      context.fillStyle = "red";
+      context.fill();
+      context.closePath();
+    }
   }
 
 }
