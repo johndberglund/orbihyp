@@ -3,7 +3,6 @@ var scrCenterX;
 var scrCenterY;
 var epsilon = 0.0000001;
 var hZoom = 1;
-var identity = [[1,0,0],[0,1,0],[0,0,1]];
 
 // sturctural variables: only change when orbifold changes
 // atomList[i] = [type, param1, param2, ...] e.g. ["C4", 3, 4] or ["S5", 2, 3, 4] or ["P6", 2, 3, 4]
@@ -45,7 +44,6 @@ let originFDCent;
 let recenterMat;
 // paramPtList[i] = endpoints of each edge in match[] in lowest atom. also twist.
 let paramPtList;
-let fdArea;
 // allGenMats[i] = matrices of genMaps[]. Duplicates allowed.
 let allGenMats;
 // allMappedCents[i] = move originFDCent by allGenMats[]
@@ -115,10 +113,8 @@ function reDo() {
   }
   atomPtList = atomPtList.map(atom => atom.map(p => multMatVect(recenterMat, p)));
   buildAllGenMats();
+  console.log("allGenMats[14]:", JSON.stringify(allGenMats[14]));
   buildAllMappedCents();
-  buildIndexedCents();
-  buildGenMats();
-  buildNeighborMats();
 
   console.log(JSON.stringify([handle, crosscap, cone, kali]));
   console.log("atomList: " + JSON.stringify(atomList));
@@ -623,79 +619,8 @@ function buildAllMappedCents() {
   });
   // filter out allGenMats entries whose center maps back to origin
   for (let i = 0; i < allGenMats.length; i++) {
+if (i===14) {alert(JSON.stringify([allGenMats[i],allMappedCents[i]]));}
     if (allMappedCents[i] === null) {allGenMats[i] = null;}
-  }
-}
-
-
-// Builds indexedCents[] and uniqGens[].
-// indexedCents[i] = i if allMappedCents[i] is a new unique center,
-//                 = j (j < i) if it duplicates allMappedCents[j],
-//                 = null if allMappedCents[i] is null.
-// uniqGens[] = list of indices i where indexedCents[i] === i (unique generators).
-function buildIndexedCents() {
-  indexedCents = [];
-  uniqGens = [];
-  for (let i = 0; i < allMappedCents.length; i++) {
-    if (allMappedCents[i] === null) {
-      indexedCents.push(null);
-      continue;
-    }
-    let found = -1;
-    for (let k = 0; k < uniqGens.length; k++) {
-      if (hDist(allMappedCents[i], allMappedCents[uniqGens[k]]) < 0.001) {
-        found = uniqGens[k];
-        break;
-      }
-    }
-    if (found === -1) {
-      indexedCents.push(i);
-      uniqGens.push(i);
-    } else {
-      indexedCents.push(found);
-    }
-  }
-}
-
-
-// Builds genMats[] — unique non-null matrices, one per entry in uniqGens[].
-// genMats[k] = allGenMats[uniqGens[k]].
-function buildGenMats() {
-  genMats = uniqGens.map(i => allGenMats[i]);
-}
-
-
-// BFS over genMats[] to build neighborMats[], neighborCents[], neighborMaps[].
-// neighborMats[0] = identity, neighborCents[0] = origin [1,0,0].
-// neighborMaps[i] = array of genMats indices composing neighborMats[i+1], e.g. [3] or [4,7].
-// Stops expanding when newCent[0] >= maxT (outside display range).
-var maxT;
-function buildNeighborMats() {
-  // target ~70 tiles on screen: maxT = 1 + 10·fdArea, clamped to [30, 1000]
-  maxT = Math.min(1000, Math.max(30, Math.round(1 + 10 * fdArea)));
-  neighborMats  = [identity];
-  neighborCents = [originFDCent];
-  neighborMaps  = [];           // neighborMaps[i] corresponds to neighborMats[i+1]
-
-  let matIndex = 0;
-  while (matIndex < neighborMats.length) {
-    // remember neighborMats and Maps are offset by one.
-    let parentSeq = matIndex === 0 ? [] : neighborMaps[matIndex - 1];
-    for (let k = 0; k < genMats.length; k++) {
-      let newMat  = multMatMat(genMats[k], neighborMats[matIndex]);
-      let newCent = multMatVect(newMat, originFDCent);
-      if (newCent[0] >= maxT) continue;
-      let isNew = true;
-      for (let j = 0; j < neighborCents.length; j++) {
-        if (hDist(neighborCents[j], newCent) < 0.001) { isNew = false; break; }
-      }
-      if (isNew) {
-        neighborMats.push(newMat);
-        neighborCents.push(newCent);
-        neighborMaps.push([k, ...parentSeq]);
-      }
-    }
-    matIndex++;
   }
 }
 
@@ -723,7 +648,6 @@ function buildOriginFDCent() {
     cz += area * triCent[2];
     totalArea += area;
   }
-  fdArea = totalArea;
   originFDCent = hNorm([cx / totalArea, cy / totalArea, cz / totalArea]);
 }
 
@@ -855,7 +779,7 @@ function transOrigMat(P) {
 
 function transMat(P, Q) {
   let pRefl = JSON.stringify(P) === "[1,0,0]"
-    ? identity
+    ? [[1,0,0],[0,1,0],[0,0,1]]
     : hFlipMat(P, [1,0,0]);
   let newQ = multMatVect(pRefl, Q);
   let trans1 = transOrigMat(newQ);
@@ -882,14 +806,14 @@ function isomSeg2Seg(P, Q, R, S, twist=0) {
   }
   let reflMat1, reflMat2;
   if (hDist(P, R) < epsilon) {
-    if (hDist(Q, S) < epsilon) return identity;
+    if (hDist(Q, S) < epsilon) return [[1,0,0],[0,1,0],[0,0,1]];
     reflMat1 = hFlipMat(Q, S);
     reflMat2 = hReflMat(points2Line(R, S));
     return multMatMat(reflMat2, reflMat1);
   }
   reflMat1 = hReflMat(vectMinus(P, R));
   let QPrime = multMatVect(reflMat1, Q);
-  reflMat2 = hDist(S, QPrime) < epsilon * 1000
+  reflMat2 = hDist(S, QPrime) < epsilon
     ? hReflMat(points2Line(R, S))
     : hReflMat(vectMinus(S, QPrime));
   return multMatMat(reflMat2, reflMat1);
@@ -1228,10 +1152,15 @@ function draw() {
     context.stroke();
   }
 
-  // draw originFD transformed by all neighborMats
-  if (neighborMats && originFD && originFD.length > 0) {
-    for (let i = 0; i < neighborMats.length; i++) {
-      let transformed = originFD.map(p => multMatVect(neighborMats[i], p));
+  // TEMP: draw originFD transformed by each allGenMats entry
+  if (allGenMats && originFD && originFD.length > 0) {
+    let seenCenters = [];
+    for (let i = 0; i < allGenMats.length; i++) {
+      if (!allGenMats[i]) continue;
+      let cent = multMatVect(allGenMats[i], originFDCent);
+      if (seenCenters.some(c => hDist(c, cent) < 0.1)) continue;
+      seenCenters.push(cent);
+      let transformed = originFD.map(p => multMatVect(allGenMats[i], p));
       let verts = polyMoreVert(transformed).map(p => pt2Screen(p, hZoom));
       context.beginPath();
       context.moveTo(verts[verts.length-1][0], verts[verts.length-1][1]);
@@ -1297,10 +1226,11 @@ function draw() {
     context.closePath();
   }
 
-  // draw all neighborCents
-  if (neighborCents) {
-    for (let i = 0; i < neighborCents.length; i++) {
-      let ctr = pt2Screen(neighborCents[i], hZoom);
+  // draw centers for each isometry in allMappedCents[]
+  if (allMappedCents) {
+    for (let i = 0; i < allMappedCents.length; i++) {
+      if (allMappedCents[i] === null) continue;
+      let ctr = pt2Screen(allMappedCents[i], hZoom);
       context.beginPath();
       context.arc(ctr[0], ctr[1], 3, 0, 2 * Math.PI);
       context.fillStyle = "red";
