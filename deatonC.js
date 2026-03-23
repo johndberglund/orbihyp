@@ -9,9 +9,11 @@ var mode = 1;        // -1=pan, 0=edit, 1=line, n>=3=polygon
 var ngon = 5;
 var color = "#000000";
 var fill = 0;
-var snapMode = false;
-var specialPts = [];   // scene-space cone/kali vertices for snap
-var reflEdges  = [];   // scene-space [P,Q] pairs for reflection-edge snap
+var gridMode  = true;
+var snapMode  = false;
+var snapThreshold = 4;  // pixel radius for snap hit-test
+var specialPts = [];    // scene-space cone/kali vertices for snap
+var reflEdges  = [];    // scene-space [P,Q] pairs for reflection-edge snap
 var stack = [];
 var undoStack = [];
 var moveMat     = [[1,0,0],[0,1,0],[0,0,1]];
@@ -1356,15 +1358,6 @@ function updateBaseFD() {
 // The Poincaré FD is the Voronoi cell of originFDCent: all points closer to
 // originFDCent than to any genMat-translated copy of originFDCent.
 
-// Returns true if P is in (or on the boundary of) the Poincaré FD.
-function isPoincareFD(P) {
-  let d0 = hDist(P, originFDCent);
-  for (let k = 0; k < genMats.length; k++) {
-    if (hDist(P, multMatVect(genMats[k], originFDCent)) < d0 - epsilon) return false;
-  }
-  return true;
-}
-
 // Returns {pt, path} where pt is P's representative inside the Poincaré FD and
 // path = [k1, k2, ...] such that genMats[k1]*genMats[k2]*...*pt ≈ P.
 // Ties on the boundary are broken by choosing the lowest generator index.
@@ -1411,9 +1404,7 @@ function buildSpecialPts() {
     let op = gp ? gp[1] : null, oi = gi ? gi[1] : null;
     let pt = originFD[i];
     if (pt[0] >= 1000) continue;  // skip ideal/infinite points
-    // Kali corner: both adjacent edges are reflections
-    if (op === 0 && oi === 0) { specialPts.push({pt, type: 'kali'}); continue; }
-    // Kali boundary: one edge is a reflection, adjacent is not direct–direct pair
+    // Kali point: at least one adjacent edge is a reflection
     if (op === 0 || oi === 0) { specialPts.push({pt, type: 'kali'}); continue; }
     // Cone point: both adjacent edges are direct AND they are each other's partner
     if (op === 1 && oi === 1 && gp[0] === i && gi[0] === prev) {
@@ -1434,14 +1425,14 @@ function getSnappedPoint(P, screenPos) {
     for (let i = path.length - 1; i >= 0; i--) q = multMatVect(genMats[path[i]], q);
     return q;
   }
-  let threshold = 4;   // pixels
-  let bestDist = threshold;
+  let bestDist = snapThreshold;
   let snapped  = null;
   // Check cone/kali special points
   for (let sp of specialPts) {
-    let sc = dispPt(fromPFD(sp.pt));
-    let d  = Math.hypot(sc[0] - screenPos[0], sc[1] - screenPos[1]);
-    if (d < bestDist) { bestDist = d; snapped = fromPFD(sp.pt); }
+    let tpt = fromPFD(sp.pt);
+    let sc  = dispPt(tpt);
+    let d   = Math.hypot(sc[0] - screenPos[0], sc[1] - screenPos[1]);
+    if (d < bestDist) { bestDist = d; snapped = tpt; }
   }
   if (snapped) return snapped;
   // Check reflection edges — snap to foot of perpendicular
@@ -1557,6 +1548,7 @@ function setMode(newMode) {
 
 function setColor() { color = document.getElementById("color").value; }
 function setFill()  { fill  = document.getElementById("fill").checked  ? 1 : 0; }
+function setGrid()  { gridMode = document.getElementById("grid").checked; draw(); }
 function setSnap()  { snapMode = document.getElementById("snap").checked; }
 
 function setZoom() {
@@ -1843,35 +1835,37 @@ function draw() {
   context.stroke();
   context.closePath();
 
-  // draw baseFD tile filled beige (draw before other tiles so outlines appear on top)
+  // draw FD tiles
   if (neighborMats && originFD && originFD.length > 0) {
+    // baseFD — beige fill and outline only when grid is on
     let vv = originFD.map(p => multMatVect(moveMat, multMatVect(neighborMats[baseFDIdx], p)));
-    context.beginPath();
-    addGeodPolyPath(context, vv);
-    context.closePath();
-    context.fillStyle = "beige";
-    context.fill();
-    context.strokeStyle = "darkgrey";
-    context.lineWidth = 2;
-    context.stroke();
-  }
-
-  // draw all neighbor tiles (outlines, baseFD already drawn above)
-  if (neighborMats && originFD && originFD.length > 0) {
-    for (let i = 0; i < neighborMats.length; i++) {
-      if (i === baseFDIdx) continue;
-      let vv = originFD.map(p => multMatVect(moveMat, multMatVect(neighborMats[i], p)));
+    if (gridMode) {
       context.beginPath();
       addGeodPolyPath(context, vv);
-      context.strokeStyle = "red";
+      context.closePath();
+      context.fillStyle = "beige";
+      context.fill();
+      context.strokeStyle = "lightgrey";
       context.lineWidth = 1;
       context.stroke();
-      context.closePath();
+    }
+    // neighbor tiles — light grey outlines, only when grid is on
+    if (gridMode) {
+      context.strokeStyle = "lightgrey";
+      context.lineWidth = 1;
+      for (let i = 0; i < neighborMats.length; i++) {
+        if (i === baseFDIdx) continue;
+        let vv2 = originFD.map(p => multMatVect(moveMat, multMatVect(neighborMats[i], p)));
+        context.beginPath();
+        addGeodPolyPath(context, vv2);
+        context.stroke();
+        context.closePath();
+      }
     }
   }
 
-  // draw paramPtList segments
-  if (paramPtList) {
+  // draw paramPtList segments — only in edit mode
+  if (mode === 0 && paramPtList) {
     for (let j = 1; j < paramPtList.length; j++) {
       if (!paramPtList[j]) continue;
       let [P, Q, twist] = paramPtList[j];
@@ -1991,26 +1985,5 @@ function draw() {
     }
   }
 
-  // draw FD center (blue dot)
-  if (originFDCent) {
-    let ctr = dispPt(originFDCent);
-    context.beginPath();
-    context.arc(ctr[0], ctr[1], 4, 0, 2 * Math.PI);
-    context.fillStyle = "blue";
-    context.fill();
-    context.closePath();
-  }
-
-  // draw all neighborCents (red dots)
-  if (neighborCents) {
-    for (let i = 0; i < neighborCents.length; i++) {
-      let ctr = dispPt(neighborCents[i]);
-      context.beginPath();
-      context.arc(ctr[0], ctr[1], 3, 0, 2 * Math.PI);
-      context.fillStyle = "red";
-      context.fill();
-      context.closePath();
-    }
-  }
 
 }
