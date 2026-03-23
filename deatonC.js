@@ -9,6 +9,9 @@ var mode = 1;        // -1=pan, 0=edit, 1=line, n>=3=polygon
 var ngon = 5;
 var color = "#000000";
 var fill = 0;
+var snapMode = false;
+var specialPts = [];   // scene-space cone/kali vertices for snap
+var reflEdges  = [];   // scene-space [P,Q] pairs for reflection-edge snap
 var stack = [];
 var undoStack = [];
 var moveMat     = [[1,0,0],[0,1,0],[0,0,1]];
@@ -1349,6 +1352,109 @@ function updateBaseFD() {
   baseFDIdx = bestIdx;
 }
 
+// ── Poincaré FD ───────────────────────────────────────────────────────────────
+// The Poincaré FD is the Voronoi cell of originFDCent: all points closer to
+// originFDCent than to any genMat-translated copy of originFDCent.
+
+// Returns true if P is in (or on the boundary of) the Poincaré FD.
+function isPoincareFD(P) {
+  let d0 = hDist(P, originFDCent);
+  for (let k = 0; k < genMats.length; k++) {
+    if (hDist(P, multMatVect(genMats[k], originFDCent)) < d0 - epsilon) return false;
+  }
+  return true;
+}
+
+// Returns {pt, path} where pt is P's representative inside the Poincaré FD and
+// path = [k1, k2, ...] such that genMats[k1]*genMats[k2]*...*pt ≈ P.
+// Ties on the boundary are broken by choosing the lowest generator index.
+function toPoincareFDRep(P) {
+  let cur = hNorm(P);
+  let path = [];
+  let improved = true;
+  while (improved) {
+    improved = false;
+    let d = hDist(cur, originFDCent);
+    let bestK = -1, bestD = d;
+    for (let k = 0; k < genMats.length; k++) {
+      let dc = hDist(multMatVect(invMat(genMats[k]), cur), originFDCent);
+      // strictly better, or tie-break by lower index
+      if (dc < bestD - epsilon || (Math.abs(dc - bestD) < epsilon && bestK < 0)) {
+        bestD = dc; bestK = k;
+      }
+    }
+    if (bestK >= 0 && bestD < d - epsilon) {
+      cur = hNorm(multMatVect(invMat(genMats[bestK]), cur));
+      path.push(bestK);
+      improved = true;
+    }
+  }
+  return { pt: cur, path };
+}
+
+// Builds specialPts[] (cone/kali scene-space vertices) and reflEdges[] ([P,Q] pairs)
+// from originFD and genMaps. Called at end of rebuildGeom().
+function buildSpecialPts() {
+  specialPts = [];
+  reflEdges  = [];
+  let n = originFD.length;
+  for (let i = 0; i < n; i++) {
+    let gm = genMaps[i];
+    // Collect reflection edges (skip ideal vertices — t coord very large)
+    if (gm && gm[1] === 0) {
+      let A = originFD[i], B = originFD[(i + 1) % n];
+      if (A[0] < 1000 && B[0] < 1000) reflEdges.push([A, B]);
+    }
+    // Classify vertex i (between edge prev and edge i)
+    let prev = (i - 1 + n) % n;
+    let gp = genMaps[prev], gi = genMaps[i];
+    let op = gp ? gp[1] : null, oi = gi ? gi[1] : null;
+    let pt = originFD[i];
+    if (pt[0] >= 1000) continue;  // skip ideal/infinite points
+    // Kali corner: both adjacent edges are reflections
+    if (op === 0 && oi === 0) { specialPts.push({pt, type: 'kali'}); continue; }
+    // Kali boundary: one edge is a reflection, adjacent is not direct–direct pair
+    if (op === 0 || oi === 0) { specialPts.push({pt, type: 'kali'}); continue; }
+    // Cone point: both adjacent edges are direct AND they are each other's partner
+    if (op === 1 && oi === 1 && gp[0] === i && gi[0] === prev) {
+      specialPts.push({pt, type: 'cone'}); continue;
+    }
+  }
+}
+
+// Given a scene-space point P and its screen position screenPos=[x,y],
+// returns a snapped scene-space point if within 4px of a special point or
+// reflection edge; otherwise returns P unchanged.
+function getSnappedPoint(P, screenPos) {
+  let rep  = toPoincareFDRep(P);
+  let path = rep.path;
+  // Reconstruct a poincaré-FD point back into the same tile as P.
+  function fromPFD(Q) {
+    let q = Q;
+    for (let i = path.length - 1; i >= 0; i--) q = multMatVect(genMats[path[i]], q);
+    return q;
+  }
+  let threshold = 4;   // pixels
+  let bestDist = threshold;
+  let snapped  = null;
+  // Check cone/kali special points
+  for (let sp of specialPts) {
+    let sc = dispPt(fromPFD(sp.pt));
+    let d  = Math.hypot(sc[0] - screenPos[0], sc[1] - screenPos[1]);
+    if (d < bestDist) { bestDist = d; snapped = fromPFD(sp.pt); }
+  }
+  if (snapped) return snapped;
+  // Check reflection edges — snap to foot of perpendicular
+  for (let [A, B] of reflEdges) {
+    let sA = fromPFD(A), sB = fromPFD(B);
+    let foot = footOfPerp(P, points2Line(sA, sB));
+    let sc   = dispPt(foot);
+    let d    = Math.hypot(sc[0] - screenPos[0], sc[1] - screenPos[1]);
+    if (d < bestDist) { bestDist = d; snapped = foot; }
+  }
+  return snapped || P;
+}
+
 // Aligns moveMat so the tile nearest to (1,0,0) becomes the identity tile.
 // Uses a greedy walk through genMats to find the true nearest tile globally.
 // Rebuilds neighborMats from the new position. Returns true if an align occurred.
@@ -1437,6 +1543,7 @@ function rebuildGeom() {
   buildGenMats();
   buildNeighborMats();
   updateBaseFD();
+  buildSpecialPts();
 }
 
 
@@ -1449,7 +1556,8 @@ function setMode(newMode) {
 }
 
 function setColor() { color = document.getElementById("color").value; }
-function setFill()  { fill = document.getElementById("fill").checked ? 1 : 0; }
+function setFill()  { fill  = document.getElementById("fill").checked  ? 1 : 0; }
+function setSnap()  { snapMode = document.getElementById("snap").checked; }
 
 function setZoom() {
   hZoom = Number(document.getElementById("zoom").value);
@@ -1642,7 +1750,9 @@ function mouseMoved(event) {
   }
 
   if (mode === 0 && shapeNum >= 0) { // edit: move control point live
-    stack[shapeNum][controlPt] = multMatVect(invMat(moveMat), posB3d);
+    let sceneP = multMatVect(invMat(moveMat), posB3d);
+    if (snapMode) sceneP = getSnappedPoint(sceneP, posB);
+    stack[shapeNum][controlPt] = sceneP;
     draw();
     return;
   }
@@ -1680,9 +1790,19 @@ function mouseReleased(event) {
     let inv = getInvMove();
     let P = multMatVect(inv, posA3d);
     let Q = multMatVect(inv, posB3d);
+    if (snapMode) {
+      P = getSnappedPoint(P, posA);
+      Q = getSnappedPoint(Q, posB);
+    }
     undoStack = [];
-    if (mode === 1) stack.push([1, P, Q, color]);
-    else            stack.push([mode, P, Q, color, fill]);
+    if (mode === 1) {
+      stack.push([1, P, Q, color]);
+      let Prep = toPoincareFDRep(P), Qrep = toPoincareFDRep(Q);
+      console.log('P  raw:', JSON.stringify(P),  '| poincareFD pt:', JSON.stringify(Prep.pt),  'path:', JSON.stringify(Prep.path));
+      console.log('Q  raw:', JSON.stringify(Q),  '| poincareFD pt:', JSON.stringify(Qrep.pt),  'path:', JSON.stringify(Qrep.path));
+    } else {
+      stack.push([mode, P, Q, color, fill]);
+    }
   }
 
   posA = 0; posB = 0; posA3d = 0; posB3d = 0;
