@@ -19,21 +19,14 @@ var sBackupStack = [], sBackupSymVects = [];
 function sNormalize(a)  { return scalarVect(1/vectLeng(a),a); }
 function sReflect(n, v) { n = sNormalize(n); return vectSum(v, scalarVect(-2*dot(n,v), n)); }
 
-// Rodrigues rotation matrix stored row-major (multVectMat uses row-vector convention)
+// Rodrigues rotation matrix as 2D array (column-vector convention: v' = M·v)
 function sRotMat(axis, angle) {
   axis = sNormalize(axis);
   var c = Math.cos(angle), s = Math.sin(angle);
   var x = axis[0], y = axis[1], z = axis[2];
-  return [c+x*x*(1-c),   x*y*(1-c)-z*s, x*z*(1-c)+y*s,
-          y*x*(1-c)+z*s, c+y*y*(1-c),   y*z*(1-c)-x*s,
-          z*x*(1-c)-y*s, z*y*(1-c)+x*s, c+z*z*(1-c)];
-}
-
-// row-vector convention: result = v * M
-function multVectMat(v, m) {
-  return [v[0]*m[0]+v[1]*m[3]+v[2]*m[6],
-          v[0]*m[1]+v[1]*m[4]+v[2]*m[7],
-          v[0]*m[2]+v[1]*m[5]+v[2]*m[8]];
+  return [[c+x*x*(1-c),   x*y*(1-c)-z*s, x*z*(1-c)+y*s],
+          [y*x*(1-c)+z*s, c+y*y*(1-c),   y*z*(1-c)-x*s],
+          [z*x*(1-c)-y*s, z*y*(1-c)+x*s, c+z*z*(1-c)]];
 }
 
 // sphere ↔ screen
@@ -137,107 +130,107 @@ function sMapOneInner(myMap, myOrbi, x, y, z) {
     case 1: // *532
       switch(myMap) {
         case 1:  xOut=x; yOut=y; zOut=z; break;
-        case 2:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[2],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 3:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[0],0.4*Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[2],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 4:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[0],0.8*Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[2],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 5:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[0],1.2*Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[2],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 6:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[0],1.6*Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[2],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 7:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[1],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 8:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[2],Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 9:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[0],0.4*Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[2],Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 10: newPt=multVectMat([x,y,z],sRotMat(sSymVects[0],0.8*Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[2],Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 11: newPt=multVectMat([x,y,z],sRotMat(sSymVects[0],1.2*Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[2],Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 12: newPt=multVectMat([x,y,z],sRotMat(sSymVects[0],1.6*Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[2],Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 2:  newPt=multMatVect(sRotMat(sSymVects[2],Math.PI),[x,y,z]); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 3:  newPt=multMatVect(sRotMat(sSymVects[0],0.4*Math.PI),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[2],Math.PI),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 4:  newPt=multMatVect(sRotMat(sSymVects[0],0.8*Math.PI),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[2],Math.PI),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 5:  newPt=multMatVect(sRotMat(sSymVects[0],1.2*Math.PI),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[2],Math.PI),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 6:  newPt=multMatVect(sRotMat(sSymVects[0],1.6*Math.PI),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[2],Math.PI),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 7:  newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),[x,y,z]); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 8:  newPt=multMatVect(sRotMat(sSymVects[2],Math.PI),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 9:  newPt=multMatVect(sRotMat(sSymVects[0],0.4*Math.PI),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[2],Math.PI),newPt); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 10: newPt=multMatVect(sRotMat(sSymVects[0],0.8*Math.PI),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[2],Math.PI),newPt); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 11: newPt=multMatVect(sRotMat(sSymVects[0],1.2*Math.PI),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[2],Math.PI),newPt); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 12: newPt=multMatVect(sRotMat(sSymVects[0],1.6*Math.PI),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[2],Math.PI),newPt); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
         case 13: newPt=sReflect(sSymVects[1],[x,y,z]); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 14: newPt=multVectMat([x,y,z],sRotMat(sSymVects[2],Math.PI)); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 15: newPt=multVectMat([x,y,z],sRotMat(sSymVects[0],0.4*Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[2],Math.PI)); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 16: newPt=multVectMat([x,y,z],sRotMat(sSymVects[0],0.8*Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[2],Math.PI)); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 17: newPt=multVectMat([x,y,z],sRotMat(sSymVects[0],1.2*Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[2],Math.PI)); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 18: newPt=multVectMat([x,y,z],sRotMat(sSymVects[0],1.6*Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[2],Math.PI)); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 19: newPt=multVectMat([x,y,z],sRotMat(sSymVects[1],Math.PI)); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 20: newPt=multVectMat([x,y,z],sRotMat(sSymVects[2],Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI)); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 21: newPt=multVectMat([x,y,z],sRotMat(sSymVects[0],0.4*Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[2],Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI)); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 22: newPt=multVectMat([x,y,z],sRotMat(sSymVects[0],0.8*Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[2],Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI)); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 23: newPt=multVectMat([x,y,z],sRotMat(sSymVects[0],1.2*Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[2],Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI)); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 24: newPt=multVectMat([x,y,z],sRotMat(sSymVects[0],1.6*Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[2],Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI)); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 14: newPt=multMatVect(sRotMat(sSymVects[2],Math.PI),[x,y,z]); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 15: newPt=multMatVect(sRotMat(sSymVects[0],0.4*Math.PI),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[2],Math.PI),newPt); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 16: newPt=multMatVect(sRotMat(sSymVects[0],0.8*Math.PI),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[2],Math.PI),newPt); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 17: newPt=multMatVect(sRotMat(sSymVects[0],1.2*Math.PI),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[2],Math.PI),newPt); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 18: newPt=multMatVect(sRotMat(sSymVects[0],1.6*Math.PI),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[2],Math.PI),newPt); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 19: newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),[x,y,z]); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 20: newPt=multMatVect(sRotMat(sSymVects[2],Math.PI),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),newPt); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 21: newPt=multMatVect(sRotMat(sSymVects[0],0.4*Math.PI),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[2],Math.PI),newPt); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),newPt); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 22: newPt=multMatVect(sRotMat(sSymVects[0],0.8*Math.PI),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[2],Math.PI),newPt); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),newPt); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 23: newPt=multMatVect(sRotMat(sSymVects[0],1.2*Math.PI),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[2],Math.PI),newPt); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),newPt); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 24: newPt=multMatVect(sRotMat(sSymVects[0],1.6*Math.PI),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[2],Math.PI),newPt); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),newPt); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
       } break;
     case 2: // 532
       switch(myMap) {
         case 1:  xOut=x; yOut=y; zOut=z; break;
-        case 2:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[2],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 3:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[0],0.4*Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[2],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 4:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[0],0.8*Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[2],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 5:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[0],1.2*Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[2],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 6:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[0],1.6*Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[2],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 7:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[1],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 8:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[2],Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 9:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[0],0.4*Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[2],Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 10: newPt=multVectMat([x,y,z],sRotMat(sSymVects[0],0.8*Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[2],Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 11: newPt=multVectMat([x,y,z],sRotMat(sSymVects[0],1.2*Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[2],Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 12: newPt=multVectMat([x,y,z],sRotMat(sSymVects[0],1.6*Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[2],Math.PI)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 2:  newPt=multMatVect(sRotMat(sSymVects[2],Math.PI),[x,y,z]); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 3:  newPt=multMatVect(sRotMat(sSymVects[0],0.4*Math.PI),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[2],Math.PI),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 4:  newPt=multMatVect(sRotMat(sSymVects[0],0.8*Math.PI),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[2],Math.PI),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 5:  newPt=multMatVect(sRotMat(sSymVects[0],1.2*Math.PI),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[2],Math.PI),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 6:  newPt=multMatVect(sRotMat(sSymVects[0],1.6*Math.PI),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[2],Math.PI),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 7:  newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),[x,y,z]); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 8:  newPt=multMatVect(sRotMat(sSymVects[2],Math.PI),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 9:  newPt=multMatVect(sRotMat(sSymVects[0],0.4*Math.PI),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[2],Math.PI),newPt); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 10: newPt=multMatVect(sRotMat(sSymVects[0],0.8*Math.PI),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[2],Math.PI),newPt); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 11: newPt=multMatVect(sRotMat(sSymVects[0],1.2*Math.PI),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[2],Math.PI),newPt); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 12: newPt=multMatVect(sRotMat(sSymVects[0],1.6*Math.PI),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[2],Math.PI),newPt); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
       } break;
     case 3: // *432
       switch(myMap) {
         case 1:  xOut=x; yOut=y; zOut=z; break;
-        case 2:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[1],Math.PI/2)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 3:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[0],Math.PI/2)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI/2)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 4:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[1],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 5:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[1],Math.PI/2)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 6:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[0],Math.PI/2)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI/2)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 2:  newPt=multMatVect(sRotMat(sSymVects[1],Math.PI/2),[x,y,z]); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 3:  newPt=multMatVect(sRotMat(sSymVects[0],Math.PI/2),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI/2),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 4:  newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),[x,y,z]); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 5:  newPt=multMatVect(sRotMat(sSymVects[1],Math.PI/2),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 6:  newPt=multMatVect(sRotMat(sSymVects[0],Math.PI/2),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI/2),newPt); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
         case 7:  newPt=sReflect(sSymVects[1],[x,y,z]); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 8:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[1],Math.PI/2)); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 9:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[0],Math.PI/2)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI/2)); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 10: newPt=multVectMat([x,y,z],sRotMat(sSymVects[1],Math.PI)); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 11: newPt=multVectMat([x,y,z],sRotMat(sSymVects[1],Math.PI/2)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI)); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 12: newPt=multVectMat([x,y,z],sRotMat(sSymVects[0],Math.PI/2)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI/2)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI)); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 8:  newPt=multMatVect(sRotMat(sSymVects[1],Math.PI/2),[x,y,z]); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 9:  newPt=multMatVect(sRotMat(sSymVects[0],Math.PI/2),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI/2),newPt); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 10: newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),[x,y,z]); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 11: newPt=multMatVect(sRotMat(sSymVects[1],Math.PI/2),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),newPt); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 12: newPt=multMatVect(sRotMat(sSymVects[0],Math.PI/2),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI/2),newPt); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),newPt); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
       } break;
     case 4: // 432
       switch(myMap) {
         case 1: xOut=x; yOut=y; zOut=z; break;
-        case 2: newPt=multVectMat([x,y,z],sRotMat(sSymVects[1],Math.PI/2)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 3: newPt=multVectMat([x,y,z],sRotMat(sSymVects[0],Math.PI/2)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI/2)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 4: newPt=multVectMat([x,y,z],sRotMat(sSymVects[1],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 5: newPt=multVectMat([x,y,z],sRotMat(sSymVects[1],Math.PI/2)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 6: newPt=multVectMat([x,y,z],sRotMat(sSymVects[0],Math.PI/2)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI/2)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 2: newPt=multMatVect(sRotMat(sSymVects[1],Math.PI/2),[x,y,z]); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 3: newPt=multMatVect(sRotMat(sSymVects[0],Math.PI/2),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI/2),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 4: newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),[x,y,z]); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 5: newPt=multMatVect(sRotMat(sSymVects[1],Math.PI/2),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 6: newPt=multMatVect(sRotMat(sSymVects[0],Math.PI/2),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI/2),newPt); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
       } break;
     case 5: // *332
       switch(myMap) {
         case 1:  xOut=x; yOut=y; zOut=z; break;
-        case 2:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[2],2*Math.PI/3)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 3:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[2],4*Math.PI/3)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 4:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[1],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 5:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[2],2*Math.PI/3)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 6:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[2],4*Math.PI/3)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 2:  newPt=multMatVect(sRotMat(sSymVects[2],2*Math.PI/3),[x,y,z]); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 3:  newPt=multMatVect(sRotMat(sSymVects[2],4*Math.PI/3),[x,y,z]); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 4:  newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),[x,y,z]); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 5:  newPt=multMatVect(sRotMat(sSymVects[2],2*Math.PI/3),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 6:  newPt=multMatVect(sRotMat(sSymVects[2],4*Math.PI/3),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
         case 7:  newPt=sReflect(sNormalize(sSymVects[3]),[x,y,z]); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 8:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[2],2*Math.PI/3)); newPt=sReflect(sNormalize(sSymVects[3]),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 9:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[2],4*Math.PI/3)); newPt=sReflect(sNormalize(sSymVects[3]),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 10: newPt=multVectMat([x,y,z],sRotMat(sSymVects[1],Math.PI)); newPt=sReflect(sNormalize(sSymVects[3]),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 11: newPt=multVectMat([x,y,z],sRotMat(sSymVects[2],2*Math.PI/3)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI)); newPt=sReflect(sNormalize(sSymVects[3]),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 12: newPt=multVectMat([x,y,z],sRotMat(sSymVects[2],4*Math.PI/3)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI)); newPt=sReflect(sNormalize(sSymVects[3]),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 8:  newPt=multMatVect(sRotMat(sSymVects[2],2*Math.PI/3),[x,y,z]); newPt=sReflect(sNormalize(sSymVects[3]),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 9:  newPt=multMatVect(sRotMat(sSymVects[2],4*Math.PI/3),[x,y,z]); newPt=sReflect(sNormalize(sSymVects[3]),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 10: newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),[x,y,z]); newPt=sReflect(sNormalize(sSymVects[3]),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 11: newPt=multMatVect(sRotMat(sSymVects[2],2*Math.PI/3),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),newPt); newPt=sReflect(sNormalize(sSymVects[3]),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 12: newPt=multMatVect(sRotMat(sSymVects[2],4*Math.PI/3),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),newPt); newPt=sReflect(sNormalize(sSymVects[3]),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
       } break;
     case 6: // 3*2
       switch(myMap) {
         case 1:  xOut=x; yOut=y; zOut=z; break;
-        case 2:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[2],2*Math.PI/3)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 3:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[2],4*Math.PI/3)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 2:  newPt=multMatVect(sRotMat(sSymVects[2],2*Math.PI/3),[x,y,z]); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 3:  newPt=multMatVect(sRotMat(sSymVects[2],4*Math.PI/3),[x,y,z]); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
         case 4:  newPt=sReflect(sSymVects[0],[x,y,z]); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 5:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[2],2*Math.PI/3)); newPt=sReflect(sSymVects[0],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 6:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[2],4*Math.PI/3)); newPt=sReflect(sSymVects[0],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 5:  newPt=multMatVect(sRotMat(sSymVects[2],2*Math.PI/3),[x,y,z]); newPt=sReflect(sSymVects[0],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 6:  newPt=multMatVect(sRotMat(sSymVects[2],4*Math.PI/3),[x,y,z]); newPt=sReflect(sSymVects[0],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
         case 7:  newPt=sReflect(sSymVects[1],[x,y,z]); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 8:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[2],2*Math.PI/3)); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 9:  newPt=multVectMat([x,y,z],sRotMat(sSymVects[2],4*Math.PI/3)); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 8:  newPt=multMatVect(sRotMat(sSymVects[2],2*Math.PI/3),[x,y,z]); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 9:  newPt=multMatVect(sRotMat(sSymVects[2],4*Math.PI/3),[x,y,z]); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
         case 10: newPt=sReflect(sSymVects[0],[x,y,z]); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 11: newPt=multVectMat([x,y,z],sRotMat(sSymVects[2],2*Math.PI/3)); newPt=sReflect(sSymVects[0],newPt); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 12: newPt=multVectMat([x,y,z],sRotMat(sSymVects[2],4*Math.PI/3)); newPt=sReflect(sSymVects[0],newPt); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 11: newPt=multMatVect(sRotMat(sSymVects[2],2*Math.PI/3),[x,y,z]); newPt=sReflect(sSymVects[0],newPt); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 12: newPt=multMatVect(sRotMat(sSymVects[2],4*Math.PI/3),[x,y,z]); newPt=sReflect(sSymVects[0],newPt); newPt=sReflect(sSymVects[1],newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
       } break;
     case 7: // 332
       switch(myMap) {
         case 1: xOut=x; yOut=y; zOut=z; break;
-        case 2: newPt=multVectMat([x,y,z],sRotMat(sSymVects[2],2*Math.PI/3)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 3: newPt=multVectMat([x,y,z],sRotMat(sSymVects[2],4*Math.PI/3)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 4: newPt=multVectMat([x,y,z],sRotMat(sSymVects[1],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 5: newPt=multVectMat([x,y,z],sRotMat(sSymVects[2],2*Math.PI/3)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 6: newPt=multVectMat([x,y,z],sRotMat(sSymVects[2],4*Math.PI/3)); newPt=multVectMat(newPt,sRotMat(sSymVects[1],Math.PI)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 2: newPt=multMatVect(sRotMat(sSymVects[2],2*Math.PI/3),[x,y,z]); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 3: newPt=multMatVect(sRotMat(sSymVects[2],4*Math.PI/3),[x,y,z]); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 4: newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),[x,y,z]); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 5: newPt=multMatVect(sRotMat(sSymVects[2],2*Math.PI/3),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 6: newPt=multMatVect(sRotMat(sSymVects[2],4*Math.PI/3),[x,y,z]); newPt=multMatVect(sRotMat(sSymVects[1],Math.PI),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
       } break;
     case 8: // *22n
       switch(myMap) {
@@ -250,8 +243,8 @@ function sMapOneInner(myMap, myOrbi, x, y, z) {
       switch(myMap) {
         case 1: xOut=x; yOut=y; zOut=z; break;
         case 2: newPt=sReflect(sSymVects[1],[x,y,z]); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 3: newPt=sReflect(sSymVects[0],[x,y,z]); symRotAng=Math.PI/sMyRot; newPt=multVectMat(newPt,sRotMat(sSymVects[0],symRotAng)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
-        case 4: newPt=sReflect(sSymVects[0],[x,y,z]); newPt=sReflect(sSymVects[1],newPt); symRotAng=Math.PI/sMyRot; newPt=multVectMat(newPt,sRotMat(sSymVects[0],symRotAng)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 3: newPt=sReflect(sSymVects[0],[x,y,z]); symRotAng=Math.PI/sMyRot; newPt=multMatVect(sRotMat(sSymVects[0],symRotAng),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 4: newPt=sReflect(sSymVects[0],[x,y,z]); newPt=sReflect(sSymVects[1],newPt); symRotAng=Math.PI/sMyRot; newPt=multMatVect(sRotMat(sSymVects[0],symRotAng),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
       } break;
     case 10: // 22n
       switch(myMap) {
@@ -266,7 +259,7 @@ function sMapOneInner(myMap, myOrbi, x, y, z) {
     case 12: // n×
       switch(myMap) {
         case 1: xOut=x; yOut=y; zOut=z; break;
-        case 2: newPt=sReflect(sSymVects[0],[x,y,z]); symRotAng=Math.PI/sMyRot; newPt=multVectMat(newPt,sRotMat(sSymVects[0],symRotAng)); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
+        case 2: newPt=sReflect(sSymVects[0],[x,y,z]); symRotAng=Math.PI/sMyRot; newPt=multMatVect(sRotMat(sSymVects[0],symRotAng),newPt); xOut=newPt[0]; yOut=newPt[1]; zOut=newPt[2]; break;
       } break;
     case 13: // *nn
       switch(myMap) {
@@ -458,8 +451,8 @@ function sFindBez(frontBez, rearBez, myMode, P, Q, myColor, myFill) {
       var symRotAng = 2*Math.PI / sMyRot;
       for (var i = 0; i < sMyRot; i++) {
         var curMat = sRotMat(sSymVects[0], symRotAng*i);
-        var AA = multVectMat(A3, curMat);
-        var BB = multVectMat(B3, curMat);
+        var AA = multMatVect(curMat, A3);
+        var BB = multMatVect(curMat, B3);
         sFindLineBez(frontBez, rearBez, AA, BB, myColor, myColorLite);
       }
     }
@@ -468,14 +461,14 @@ function sFindBez(frontBez, rearBez, myMode, P, Q, myColor, myFill) {
     var angleStep = 2*Math.PI / myMode;
     var myPoly = [];
     for (var k = 0; k < myMode; k++) {
-      myPoly.push(multVectMat(Q, sRotMat(P, angleStep*k)));
+      myPoly.push(multMatVect(sRotMat(P, angleStep*k), Q));
     }
     for (var map = 1; map <= sNumMaps; map++) {
       var mapPoly = myPoly.map(function(v){ return sMapOne(map, v[0], v[1], v[2]); });
       var symRotAng = 2*Math.PI / sMyRot;
       for (var i = 0; i < sMyRot; i++) {
         var curMat = sRotMat(sSymVects[0], symRotAng*i);
-        var rotPoly = mapPoly.map(function(v){ return multVectMat(v, curMat); });
+        var rotPoly = mapPoly.map(function(v){ return multMatVect(curMat, v); });
         sFindPolyBez(frontBez, rearBez, myMode, rotPoly, myColor, myColorLite, myFill);
       }
     }
@@ -500,8 +493,8 @@ function sFDVerts() {
     var ref = (Math.abs(dot(s0, [1,0,0])) < 0.9) ? [1,0,0] : [0,0,1];
     E0 = sNormalize(vectDiff(ref, scalarVect(dot(s0, ref), s0)));
   }
-  var Ehn = multVectMat(E0, sRotMat(N, pi/n));
-  var E2n = multVectMat(E0, sRotMat(N, 2*pi/n));
+  var Ehn = multMatVect(sRotMat(N, pi/n), E0);
+  var E2n = multMatVect(sRotMat(N, 2*pi/n), E0);
   switch (sOrbi) {
     case 0: { // *532: s0=5-fold, normalize(sv[2])=2-fold edge midpoint, C=3-fold face center
       var phi2 = (3+Math.sqrt(5))/2;  // φ² = φ+1 ≈ 2.618
@@ -569,7 +562,7 @@ function sFillFD(frontBez, rearBez) {
     var mapped = verts.map(function(v){ return sMapOne(map, v[0], v[1], v[2]); });
     for (var i = 0; i < sMyRot; i++) {
       var curMat  = sRotMat(sSymVects[0], symRotAng * i);
-      var rotPoly = mapped.map(function(v){ return multVectMat(v, curMat); });
+      var rotPoly = mapped.map(function(v){ return multMatVect(curMat, v); });
       var isCanon = (map === 1 && i === 0);
       sFindPolyBez(frontBez, rearBez, 0, rotPoly,
                    isCanon ? hiColor   : edgeColor,
@@ -625,7 +618,7 @@ function sDraw(ctx, c) {
   ctx.strokeStyle = "black";
   ctx.stroke();
 
-  // draw front hemisphere
+  // draw front hemisphere on top of outline
   frontBez.forEach(function(bez) {
     ctx.beginPath();
     ctx.moveTo(bez[0], bez[1]);
@@ -681,11 +674,11 @@ function sMouseMoved(sx, sy, shiftKey) {
     var len  = vectLeng(diff);
     if (len < 1e-10) return;
     var axis = cross(diff, [0,0,1]);
-    var myMatrix = sRotMat(axis, len);
+    var myMatrix = sRotMat(axis, -len);
     stack = sBackupStack.map(function(elem) {
-      return [elem[0], multVectMat(elem[1], myMatrix), multVectMat(elem[2], myMatrix), elem[3], elem[4]];
+      return [elem[0], multMatVect(myMatrix, elem[1]), multMatVect(myMatrix, elem[2]), elem[3], elem[4]];
     });
-    sSymVects = sBackupSymVects.map(function(v){ return multVectMat(v, myMatrix); });
+    sSymVects = sBackupSymVects.map(function(v){ return multMatVect(myMatrix, v); });
     draw();
     return;
   }
