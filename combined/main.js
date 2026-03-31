@@ -15,6 +15,43 @@ var fill     = 0;
 var gridMode = true;
 var snapMode = false;
 
+// ── Vector, Matrix utilities ──────────────────────────────────────────────────────────
+
+function dot(a, b)      { return a[0]*b[0] + a[1]*b[1] + a[2]*b[2]; }
+function cross(a, b)    { return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]; }
+function vectSum(a, b)  { return [a[0]+b[0], a[1]+b[1], a[2]+b[2]]; }
+function vectDiff(a, b) { return [a[0]-b[0], a[1]-b[1], a[2]-b[2]]; }
+function scalarVect(s, V) { return [V[0]*s, V[1]*s, V[2]*s]; }
+function vectLeng(a)    { return Math.sqrt(dot(a,a)); }
+
+function multMatVect(mat, vect) {
+  return [
+    vect[0]*mat[0][0] + vect[1]*mat[0][1] + vect[2]*mat[0][2],
+    vect[0]*mat[1][0] + vect[1]*mat[1][1] + vect[2]*mat[1][2],
+    vect[0]*mat[2][0] + vect[1]*mat[2][1] + vect[2]*mat[2][2]
+  ];
+}
+
+function multMatMat(M, N) {
+  let L = [];
+  for (let i = 0; i < 3; i++) {
+    let row = [];
+    for (let j = 0; j < 3; j++) {
+      let e = 0;
+      for (let k = 0; k < 3; k++) e += M[i][k]*N[k][j];
+      row.push(e);
+    }
+    L.push(row);
+  }
+  return L;
+}
+
+function matDet(M) {
+  return M[0][0]*(M[1][1]*M[2][2] - M[1][2]*M[2][1])
+       - M[0][1]*(M[1][0]*M[2][2] - M[1][2]*M[2][0])
+       + M[0][2]*(M[1][0]*M[2][1] - M[1][1]*M[2][0]);
+}
+
 // ── Orbifold helpers ──────────────────────────────────────────────────────────
 
 function computeChi(handle, crosscap, cone, kali) {
@@ -125,8 +162,8 @@ function init() {
 
   document.onkeyup = function(e) {
     var k = e.which || e.keyCode;
-    if (e.ctrlKey && k === 90) goUndo();
-    if (e.ctrlKey && k === 89) goRedo();
+    if (e.ctrlKey && k === 90) stackUndo();
+    if (e.ctrlKey && k === 89) stackRedo();
   };
 
   draw();
@@ -156,9 +193,9 @@ function draw() {
   ctx.fillStyle = "white";
   ctx.fill();
 
-  if      (geom === 'H') drawH(ctx, c);
-  else if (geom === 'E') drawE(ctx, c);
-  else if (geom === 'S') drawS(ctx, c);
+  if      (geom === 'H') hDraw(ctx, c);
+  else if (geom === 'E') eDraw(ctx, c);
+  else if (geom === 'S') sDraw(ctx, c);
 
   // Canvas label — top-left: geometry name + Conway notation
   try {
@@ -167,7 +204,7 @@ function draw() {
     var lblCone = JSON.parse(document.getElementById("cone").value);
     var lblKali = JSON.parse(document.getElementById("kali").value);
     var gName = geom === 'H' ? "Hyperbolic" : geom === 'E' ? "Euclidean" : "Spherical";
-    var lbl = gName + "  " + orbiToString(lblH, lblC, lblCone, lblKali);
+    var lbl = gName + "  " + orbi2String(lblH, lblC, lblCone, lblKali);
     ctx.font = "bold 14px sans-serif";
     ctx.fillStyle = "rgba(0,0,0,0.6)";
     ctx.fillText(lbl, 8, 20);
@@ -236,7 +273,7 @@ function selectVarS(sIdx) {
 
 // ── Canvas label ──────────────────────────────────────────────────────────────
 
-function orbiToString(handle, crosscap, cone, kali) {
+function orbi2String(handle, crosscap, cone, kali) {
   var s = "";
   for (var i=0; i<cone.length; i++) s += cone[i];
   for (var i=0; i<kali.length; i++) {
@@ -258,10 +295,10 @@ function setZoom() {
 
 // ── Common tool handlers ──────────────────────────────────────────────────────
 
-function goUndo() {
+function stackUndo() {
   if (stack.length > 0) { undoStack.push(stack.pop()); draw(); }
 }
-function goRedo() {
+function stackRedo() {
   if (undoStack.length > 0) { stack.push(undoStack.pop()); draw(); }
 }
 
@@ -350,162 +387,3 @@ function mouseReleased(event) {
 
 function mouseClicked(event) { /* drawing is handled via press/move/release */ }
 
-// ── E mouse handlers ───────────────────────────────────────────────────────────
-
-var ePanStartScreen = null;
-var ePanStartTransX = 0, ePanStartTransY = 0;
-var eEditShapeIdx = -1, eEditPtIdx = -1;
-
-function eMousePressed(sx, sy) {
-  if (gridMode) {
-    var _ha = ePt2Screen(eTranAx, eTranAy);
-    if (Math.abs(sx-_ha[0]) < 12 && Math.abs(sy-_ha[1]) < 12) { eDragHandle = 'A'; return; }
-    if (eHasHandleB(eOrbi)) {
-      var _hb = ePt2Screen(eTranBx, eTranBy);
-      if (Math.abs(sx-_hb[0]) < 12 && Math.abs(sy-_hb[1]) < 12) { eDragHandle = 'B'; return; }
-    }
-  }
-  if (mode === -1) {
-    ePanStartScreen = [sx, sy];
-    ePanStartTransX = eTransX;
-    ePanStartTransY = eTransY;
-    return;
-  }
-  var pt = eScreen2Pt(sx, sy);
-  if (mode === 0) {
-    eEditShapeIdx = -1; eEditPtIdx = -1;
-    for (var i = 0; i < stack.length; i++) {
-      var sp = ePt2Screen(stack[i][1][0], stack[i][1][1]);
-      var sq = ePt2Screen(stack[i][2][0], stack[i][2][1]);
-      if (Math.abs(sx-sp[0]) < boxSize && Math.abs(sy-sp[1]) < boxSize) { eEditShapeIdx = i; eEditPtIdx = 1; break; }
-      if (Math.abs(sx-sq[0]) < boxSize && Math.abs(sy-sq[1]) < boxSize) { eEditShapeIdx = i; eEditPtIdx = 2; break; }
-    }
-    return;
-  }
-  if (snapMode) pt = eSnapTo(pt);
-  ePosA = pt; ePosB = pt;
-  draw();
-}
-
-function eMouseMoved(sx, sy) {
-  if (eDragHandle) {
-    var pt = eScreen2Pt(sx, sy);
-    if (eDragHandle === 'A') eApplyConstraintA(pt[0], pt[1]);
-    else                     eApplyConstraintB(pt[0], pt[1]);
-    draw(); return;
-  }
-  if (mode === -1 && ePanStartScreen) {
-    eTransX = ePanStartTransX + (sx - ePanStartScreen[0]);
-    eTransY = ePanStartTransY + (sy - ePanStartScreen[1]);
-    draw();
-    return;
-  }
-  if (mode === 0 && eEditShapeIdx >= 0) {
-    var pt = eScreen2Pt(sx, sy);
-    if (snapMode) pt = eSnapTo(pt);
-    stack[eEditShapeIdx][eEditPtIdx] = pt;
-    draw();
-    return;
-  }
-  if (ePosA !== null) {
-    ePosB = eScreen2Pt(sx, sy);
-    if (snapMode) ePosB = eSnapTo(ePosB);
-    draw();
-  }
-}
-
-function eMouseReleased(sx, sy) {
-  if (eDragHandle) { eDragHandle = null; return; }
-  if (mode === -1) { ePanStartScreen = null; return; }
-  if (mode === 0)  { eEditShapeIdx = -1; draw(); return; }
-  if (ePosA !== null) {
-    ePosB = eScreen2Pt(sx, sy);
-    if (snapMode) ePosB = eSnapTo(ePosB);
-    undoStack = [];
-    stack.push([mode, ePosA, ePosB, color, fill]);
-    ePosA = null; ePosB = null;
-    draw();
-  }
-}
-
-// Simple E snap: snap to nearest lattice vertex
-function eSnapTo(pt) {
-  var det = eTranAx*eTranBy - eTranAy*eTranBx;
-  if (Math.abs(det) < 1e-10) return pt;
-  var fi = ( (pt[0]-eTranOrigx)*eTranBy - (pt[1]-eTranOrigy)*eTranBx) / det;
-  var fj = (-(pt[0]-eTranOrigx)*eTranAy + (pt[1]-eTranOrigy)*eTranAx) / det;
-  var ni = Math.round(fi), nj = Math.round(fj);
-  var near = [eTranOrigx + ni*eTranAx + nj*eTranBx,
-              eTranOrigy + ni*eTranAy + nj*eTranBy];
-  var snapPx = boxSize * 2 / eScale;
-  var dx = pt[0]-near[0], dy = pt[1]-near[1];
-  if (dx*dx+dy*dy < snapPx*snapPx) return near;
-  return pt;
-}
-
-// ── S mouse handlers ───────────────────────────────────────────────────────────
-
-var sPanPosA = null;
-var sEditShapeIdx = -1, sEditPtIdx = -1;
-var boxSize = 7;
-
-function sMousePressed(sx, sy, shiftKey) {
-  var pt3 = sScreen2vect(sx, sy, shiftKey);
-  if (mode === -1) {
-    sPanPosA = [sx, sy, shiftKey];
-    sBackupStack    = stack.map(function(s){ return [s[0], s[1].slice(), s[2].slice(), s[3], s[4]]; });
-    sBackupSymVects = sSymVects.map(function(v){ return v.slice(); });
-    return;
-  }
-  if (mode === 0) {
-    sEditShapeIdx = -1;
-    for (var i = 0; i < stack.length; i++) {
-      var sp = sVect2screen(stack[i][1]);
-      var sq = sVect2screen(stack[i][2]);
-      if (Math.abs(sx-sp[0]) < boxSize && Math.abs(sy-sp[1]) < boxSize) { sEditShapeIdx = i; sEditPtIdx = 1; break; }
-      if (Math.abs(sx-sq[0]) < boxSize && Math.abs(sy-sq[1]) < boxSize) { sEditShapeIdx = i; sEditPtIdx = 2; break; }
-    }
-    return;
-  }
-  sPosA3d = pt3; sPosB3d = pt3;
-  draw();
-}
-
-function sMouseMoved(sx, sy, shiftKey) {
-  var pt3 = sScreen2vect(sx, sy, shiftKey);
-  if (mode === -1 && sPanPosA) {
-    var diff = [(sx - sPanPosA[0]) / scrRadius, -(sy - sPanPosA[1]) / scrRadius, 0];
-    var len  = vectLeng(diff);
-    if (len < 1e-10) return;
-    var axis = cross(diff, [0,0,1]);
-    var myMatrix = sRotMat(axis, len);
-    stack = sBackupStack.map(function(elem) {
-      return [elem[0], multVectMat(elem[1], myMatrix), multVectMat(elem[2], myMatrix), elem[3], elem[4]];
-    });
-    sSymVects = sBackupSymVects.map(function(v){ return multVectMat(v, myMatrix); });
-    draw();
-    return;
-  }
-  if (mode === 0 && sEditShapeIdx >= 0) {
-    stack[sEditShapeIdx][sEditPtIdx] = pt3;
-    draw();
-    return;
-  }
-  if (sPosA3d.length > 0) {
-    sPosB3d = pt3;
-    draw();
-  }
-}
-
-function sMouseReleased(sx, sy, shiftKey) {
-  var pt3 = sScreen2vect(sx, sy, shiftKey);
-  if (mode === -1) { sPanPosA = null; return; }
-  if (mode === 0)  { sEditShapeIdx = -1; draw(); return; }
-  if (sPosA3d.length > 0) {
-    sPosB3d = pt3;
-    undoStack = [];
-    stack.push([mode, sPosA3d.slice(), sPosB3d.slice(), color, fill]);
-    sPosA3d = []; sPosB3d = [];
-    draw();
-  }
-}

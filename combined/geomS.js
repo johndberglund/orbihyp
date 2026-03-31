@@ -1,4 +1,4 @@
-// geomES.js — Euclidean and Spherical geometry for the combined orbifold app.
+// geomS.js — Spherical geometry for the combined orbifold app.
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // S (Spherical) geometry
@@ -16,14 +16,8 @@ var sBackupStack = [], sBackupSymVects = [];
 
 // ── S vector math ─────────────────────────────────────────────────────────────
 
-function dot(a, b)      { return a[0]*b[0] + a[1]*b[1] + a[2]*b[2]; }
-function cross(a, b)    { return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]; }
-function vectSum(a, b)  { return [a[0]+b[0], a[1]+b[1], a[2]+b[2]]; }
-function vectDiff(a, b) { return [a[0]-b[0], a[1]-b[1], a[2]-b[2]]; }
-function vectScale(a,s) { return [a[0]*s, a[1]*s, a[2]*s]; }
-function vectLeng(a)    { return Math.sqrt(dot(a,a)); }
-function sNormalize(a)  { return vectScale(a, 1/vectLeng(a)); }
-function sReflect(n, v) { n = sNormalize(n); return vectSum(v, vectScale(n, -2*dot(n,v))); }
+function sNormalize(a)  { return scalarVect(1/vectLeng(a),a); }
+function sReflect(n, v) { n = sNormalize(n); return vectSum(v, scalarVect(-2*dot(n,v), n)); }
 
 // Rodrigues rotation matrix stored row-major (multVectMat uses row-vector convention)
 function sRotMat(axis, angle) {
@@ -304,17 +298,17 @@ function sFindLineBez(frontBez, rearBez, A, B, myColor, myColorLite) {
 
   if (lineMode === 1 || lineMode === 2) {
     var maj = sNormalize(cross([0,0,1], pvect));
-    if (lineMode === 2) maj = vectScale(maj, -1);
+    if (lineMode === 2) maj = scalarVect(-1, maj);
     var tanMajA = sNormalize(cross(maj, pvect));
-    var tanMajB = vectScale(tanMajA, -1);
+    var tanMajB = scalarVect(-1, tanMajA);
     var myAngA = Math.acos(Math.min(1, Math.max(-1, dot(maj, A))));
     var myAngB = Math.acos(Math.min(1, Math.max(-1, dot(maj, B))));
     var k2A = 0.011 + 0.276*myAngA + 0.0436*myAngA*myAngA;
     var k2B = 0.011 + 0.276*myAngB + 0.0436*myAngB*myAngB;
-    var midA     = vectSum(A, vectScale(tanA, k2A));
-    var midB     = vectSum(B, vectScale(tanB, k2B));
-    var midMajA  = vectSum(maj, vectScale(tanMajA, k2A));
-    var midMajB  = vectSum(maj, vectScale(tanMajB, k2B));
+    var midA     = vectSum(A, scalarVect(k2A, tanA));
+    var midB     = vectSum(B, scalarVect(k2B, tanB));
+    var midMajA  = vectSum(maj, scalarVect(k2A, tanMajA));
+    var midMajB  = vectSum(maj, scalarVect(k2B, tanMajB));
     var pt1=sVect2screen(A), pt2=sVect2screen(midA),  pt3=sVect2screen(midMajA), pt4=sVect2screen(maj);
     var pt5=sVect2screen(B), pt6=sVect2screen(midB),  pt7=sVect2screen(midMajB), pt8=sVect2screen(maj);
     if (lineMode === 1) {
@@ -327,8 +321,8 @@ function sFindLineBez(frontBez, rearBez, A, B, myColor, myColorLite) {
   } else {
     var myAng = Math.acos(Math.min(1, Math.max(-1, dot(A, B))));
     var k2 = 0.011 + 0.276*myAng + 0.0436*myAng*myAng;
-    var midA = vectSum(A, vectScale(tanA, k2));
-    var midB = vectSum(B, vectScale(tanB, k2));
+    var midA = vectSum(A, scalarVect(k2, tanA));
+    var midB = vectSum(B, scalarVect(k2, tanB));
     var pt1=sVect2screen(A), pt2=sVect2screen(midA), pt3=sVect2screen(midB), pt4=sVect2screen(B);
     if (lineMode === 3) {
       rearBez.push([pt1[0],pt1[1],[[pt2[0],pt2[1],pt3[0],pt3[1],pt4[0],pt4[1]]],myColorLite,0]);
@@ -349,17 +343,17 @@ function sFindLineBez2(A, B) {
   var tanB = sNormalize(cross(B, pvect));
   if (lineMode === 1 || lineMode === 2) {
     var maj = sNormalize(cross([0,0,1], pvect));
-    if (lineMode === 2) maj = vectScale(maj, -1);
+    if (lineMode === 2) maj = scalarVect(-1, maj);
     var tanMajA = sNormalize(cross(maj, pvect));
-    var tanMajB = vectScale(tanMajA, -1);
+    var tanMajB = scalarVect(-1, tanMajA);
     var myAngA = Math.acos(Math.min(1, Math.max(-1, dot(maj, A))));
     var myAngB = Math.acos(Math.min(1, Math.max(-1, dot(maj, B))));
     var k2A = 0.011 + 0.276*myAngA + 0.0436*myAngA*myAngA;
     var k2B = 0.011 + 0.276*myAngB + 0.0436*myAngB*myAngB;
-    var midA    = vectSum(A,   vectScale(tanA,    k2A));
-    var midB    = vectSum(B,   vectScale(tanB,    k2B));
-    var midMajA = vectSum(maj, vectScale(tanMajA, k2A));
-    var midMajB = vectSum(maj, vectScale(tanMajB, k2B));
+    var midA    = vectSum(A,   scalarVect(k2A, tanA));
+    var midB    = vectSum(B,   scalarVect(k2B, tanB));
+    var midMajA = vectSum(maj, scalarVect(k2A, tanMajA));
+    var midMajB = vectSum(maj, scalarVect(k2B, tanMajB));
     var pt1=sVect2screen(A),    pt2=sVect2screen(midA),    pt3=sVect2screen(midMajA), pt4=sVect2screen(maj);
     var pt5=sVect2screen(maj),  pt6=sVect2screen(midMajB), pt7=sVect2screen(midB),    pt8=sVect2screen(B);
     if (lineMode === 1) {
@@ -372,8 +366,8 @@ function sFindLineBez2(A, B) {
   } else {
     var myAng = Math.acos(Math.min(1, Math.max(-1, dot(A, B))));
     var k2 = 0.011 + 0.276*myAng + 0.0436*myAng*myAng;
-    var midA = vectSum(A, vectScale(tanA, k2));
-    var midB = vectSum(B, vectScale(tanB, k2));
+    var midA = vectSum(A, scalarVect(k2, tanA));
+    var midB = vectSum(B, scalarVect(k2, tanB));
     var pt1=sVect2screen(A), pt2=sVect2screen(midA), pt3=sVect2screen(midB), pt4=sVect2screen(B);
     if (lineMode === 3) {
       out.push([-1, pt1[0],pt1[1], pt2[0],pt2[1], pt3[0],pt3[1], pt4[0],pt4[1]]);
@@ -488,12 +482,111 @@ function sFindBez(frontBez, rearBez, myMode, P, Q, myColor, myFill) {
   }
 }
 
-// ── drawS(ctx, c) ─────────────────────────────────────────────────────────────
+// ── S Fundamental Domain ──────────────────────────────────────────────────────
+
+function sFDVerts() {
+  var pi = Math.PI;
+  var n  = sMyRot;
+  var s0 = sNormalize(sSymVects[0]);
+  var s1 = (sSymVects.length > 1) ? sNormalize(sSymVects[1]) : null;
+  var sX = s1 ? sNormalize(cross(s0, s1)) : null;  // perp to s0 and s1
+  var N  = s0;
+  var S  = scalarVect(-1, N);
+  // E0: equator point. Use s1 if available, else project [1,0,0] perp to N.
+  var E0;
+  if (s1) {
+    E0 = s1;
+  } else {
+    var ref = (Math.abs(dot(s0, [1,0,0])) < 0.9) ? [1,0,0] : [0,0,1];
+    E0 = sNormalize(vectDiff(ref, scalarVect(dot(s0, ref), s0)));
+  }
+  var Ehn = multVectMat(E0, sRotMat(N, pi/n));
+  var E2n = multVectMat(E0, sRotMat(N, 2*pi/n));
+  switch (sOrbi) {
+    case 0: { // *532: s0=5-fold, normalize(sv[2])=2-fold edge midpoint, C=3-fold face center
+      var phi2 = (3+Math.sqrt(5))/2;  // φ² = φ+1 ≈ 2.618
+      var e2 = sNormalize(sSymVects[2]);
+      var C532 = sNormalize(vectSum(s1, scalarVect(phi2, e2)));
+      return [s0, e2, C532];
+    }
+    case 1: { // 532 — kite of two *532 triangles
+      var phi2 = (3+Math.sqrt(5))/2;
+      var e2 = sNormalize(sSymVects[2]);
+      var C532  = sNormalize(vectSum(s1,               scalarVect(phi2, e2)));
+      var C532p = sNormalize(vectSum(scalarVect(-1, s1), scalarVect(phi2, e2)));
+      return [C532, s0, C532p, e2];
+    }
+    case 2: { // *432: s0=4-fold pole, s1=2nd axis; nsX=[0,0,1] initially
+      var nsX = scalarVect(-1, sX);
+      return [s0,
+              sNormalize(vectSum(s0, nsX)),
+              sNormalize(vectSum(vectSum(s0, s1), nsX))];
+    }
+    case 3: { // 432 — kite of two *432 triangles
+      var nsX = scalarVect(-1, sX);
+      return [sNormalize(vectSum(vectSum(s0, s1), nsX)),
+              s0,
+              sNormalize(vectSum(vectDiff(s0, s1), nsX)),
+              sNormalize(vectSum(s0, nsX))];
+    }
+    case 4: { // *332: sv[0,1,2,3] = [0,1,0],[1,0,0],[1,1,1],[0,1,1]
+      // normalize(2*sv[0]+sv[1]-sv[3]) = normalize([1,1,-1])
+      return [sNormalize(vectSum(vectSum(scalarVect(2,sSymVects[0]), sSymVects[1]),
+                                 scalarVect(-1,sSymVects[3]))),
+              s1,
+              sNormalize(sSymVects[2])];
+    }
+    case 5: { // 3*2 — *432 triangle reflected across its x=z side
+      // vertices: norm([0,1,1]), [0,1,0] (2-fold corner), norm([1,1,0]), norm([1,1,1])
+      var nsX = scalarVect(-1, sX);
+      return [sNormalize(vectSum(s0, nsX)),
+              s0,
+              sNormalize(vectSum(s0, s1)),
+              sNormalize(vectSum(vectSum(s0, s1), nsX))];
+    }
+    case 6: { // 332 — triangle of area pi/3 (twice *332 area)
+      // vertices: norm([1,1,1]), norm([1,1,-1]), norm([1,-1,-1])
+      return [sNormalize(sSymVects[2]),
+              sNormalize(vectSum(vectSum(s0, s1), sX)),
+              sNormalize(vectSum(vectDiff(s1, s0), sX))];
+    }
+    case 7: case 8:           return [N, E0, Ehn];
+    case 9: case 10: case 11: return [N, E0, E2n];
+    case 12:                  return [N, E0, S, Ehn];
+    case 13:                  return [N, E0, S, E2n];
+    default:                  return [N, E0, S];
+  }
+}
+
+function sFillFD(frontBez, rearBez) {
+  var verts     = sFDVerts();
+  var hiColor   = '#ffdc64';
+  var hiLite    = '#ffebb8';
+  var edgeColor = '#aaaaaa';
+  var edgeLite  = '#cccccc';
+  var symRotAng = 2 * Math.PI / sMyRot;
+  for (var map = 1; map <= sNumMaps; map++) {
+    var mapped = verts.map(function(v){ return sMapOne(map, v[0], v[1], v[2]); });
+    for (var i = 0; i < sMyRot; i++) {
+      var curMat  = sRotMat(sSymVects[0], symRotAng * i);
+      var rotPoly = mapped.map(function(v){ return multVectMat(v, curMat); });
+      var isCanon = (map === 1 && i === 0);
+      sFindPolyBez(frontBez, rearBez, 0, rotPoly,
+                   isCanon ? hiColor   : edgeColor,
+                   isCanon ? hiLite    : edgeLite,
+                   isCanon ? 1 : 0);
+    }
+  }
+}
+
+// ── sDraw(ctx, c) ─────────────────────────────────────────────────────────────
 // Renders the complete S scene.  stack[] items: [mode, P, Q, color, fill]
 // where P,Q are [x,y,z] unit-sphere vectors.
 
-function drawS(ctx, c) {
+function sDraw(ctx, c) {
   var frontBez = [], rearBez = [];
+
+  if (gridMode) sFillFD(frontBez, rearBez);
 
   // build bezier lists for all saved shapes
   stack.forEach(function(sh) {
@@ -553,416 +646,69 @@ function drawS(ctx, c) {
   });
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// E (Euclidean) geometry
-// ═══════════════════════════════════════════════════════════════════════════════
+// ── S mouse handlers ───────────────────────────────────────────────────────────
 
-// ── E state ───────────────────────────────────────────────────────────────────
-// With R=1, W=H=W2=0.5.  TranA/B are lattice vectors; TranOrig is the FD origin.
+var sPanPosA = null;
+var sEditShapeIdx = -1, sEditPtIdx = -1;
+var boxSize = 7;
 
-var eOrbi    = 0;
-var eNumMaps = 8;
-var eTranAx  = 2,   eTranAy = 0;
-var eTranBx  = 0,   eTranBy = 2;
-var eTranOrigx = 1, eTranOrigy = 1;
-var eScale   = 100;   // pixels per unit length
-var eTransX  = 0;     // screen X of native origin (set by init/resize)
-var eTransY  = 0;     // screen Y of native origin
-var ePosA    = null;  // native [x,y] at press
-var ePosB    = null;  // native [x,y] at current cursor
-
-// ── E coordinate conversion ───────────────────────────────────────────────────
-
-function ePt2Screen(x, y) {
-  return [eTransX + x * eScale, eTransY - y * eScale];
-}
-function eScreen2Pt(sx, sy) {
-  return [(sx - eTransX) / eScale, (eTransY - sy) / eScale];
-}
-
-// ── E group setup ─────────────────────────────────────────────────────────────
-
-function eSetGroup(idx) {
-  eOrbi = idx;
-  var s3h = 0.8660254037844386; // sqrt(3)/2
-  var s3  = 1.7320508075688772; // sqrt(3)
-  switch (idx) {
-    case 0:  // *442  p4m
-      eTranAx=2; eTranAy=0; eTranBx=0; eTranBy=2;
-      eTranOrigx=1; eTranOrigy=1; eNumMaps=8; break;
-    case 1:  // 442   p4
-      eTranAx=2; eTranAy=0; eTranBx=0; eTranBy=2;
-      eTranOrigx=1; eTranOrigy=1; eNumMaps=4; break;
-    case 2:  // 4*2   p4g
-      eTranAx=1; eTranAy=-1; eTranBx=1; eTranBy=1;
-      eTranOrigx=1.5; eTranOrigy=1.5; eNumMaps=8; break;
-    case 3:  // *632  p6m
-      eTranAx=1.5; eTranAy=s3h; eTranBx=0; eTranBy=s3;
-      eTranOrigx=1.5; eTranOrigy=s3h; eNumMaps=12; break;
-    case 4:  // *333  p3m1
-      eTranAx=1.5; eTranAy=s3h; eTranBx=0; eTranBy=s3;
-      eTranOrigx=1; eTranOrigy=0; eNumMaps=6; break;
-    case 5:  // 632   p6
-      eTranAx=1.5; eTranAy=s3h; eTranBx=0; eTranBy=s3;
-      eTranOrigx=1.5; eTranOrigy=s3h; eNumMaps=6; break;
-    case 6:  // 333   p3
-      eTranAx=1.5; eTranAy=s3h; eTranBx=0; eTranBy=s3;
-      eTranOrigx=1; eTranOrigy=0; eNumMaps=3; break;
-    case 7:  // 3*3   p31m
-      eTranAx=1.5; eTranAy=s3h; eTranBx=0; eTranBy=s3;
-      eTranOrigx=1; eTranOrigy=0; eNumMaps=6; break;
-    case 8:  // 22×   pmg   (W=H=0.5)
-      eTranAx=1; eTranAy=0; eTranBx=0; eTranBy=1;
-      eTranOrigx=0.5; eTranOrigy=0.5; eNumMaps=4; break;
-    case 9:  // *2222 pmm
-      eTranAx=1; eTranAy=0; eTranBx=0; eTranBy=1;
-      eTranOrigx=0.5; eTranOrigy=0.5; eNumMaps=4; break;
-    case 10: // 22*   cmm   (TranAx=2W=1)
-      eTranAx=2; eTranAy=0; eTranBx=0; eTranBy=1;
-      eTranOrigx=1; eTranOrigy=0.5; eNumMaps=4; break;
-    case 11: // **    pm
-      eTranAx=1; eTranAy=0; eTranBx=0; eTranBy=1;
-      eTranOrigx=0.5; eTranOrigy=0.5; eNumMaps=2; break;
-    case 12: // ××    pg
-      eTranAx=1; eTranAy=0; eTranBx=0; eTranBy=1;
-      eTranOrigx=0.5; eTranOrigy=0.5; eNumMaps=2; break;
-    case 13: // 2*22  cmm'  (oblique lattice, W=H=0.5)
-      eTranAx=1; eTranAy=-1; eTranBx=1; eTranBy=1;
-      eTranOrigx=1.5; eTranOrigy=1.5; eNumMaps=4; break;
-    case 14: // *×    cm    (W=H=0.5)
-      eTranAx=0.5; eTranAy=-1; eTranBx=0.5; eTranBy=1;
-      eTranOrigx=0.5; eTranOrigy=1.5; eNumMaps=2; break;
-    case 15: // 2222  p2    (W=W2=0.5 → TranAx=1, TranBx=0)
-      eTranAx=1; eTranAy=0; eTranBx=0; eTranBy=1;
-      eTranOrigx=0.5; eTranOrigy=0.5; eNumMaps=2; break;
-    case 16: // ○     p1
-      eTranAx=1; eTranAy=0; eTranBx=0; eTranBy=1;
-      eTranOrigx=0.5; eTranOrigy=0.5; eNumMaps=1; break;
+function sMousePressed(sx, sy, shiftKey) {
+  var pt3 = sScreen2vect(sx, sy, shiftKey);
+  if (mode === -1) {
+    sPanPosA = [sx, sy, shiftKey];
+    sBackupStack    = stack.map(function(s){ return [s[0], s[1].slice(), s[2].slice(), s[3], s[4]]; });
+    sBackupSymVects = sSymVects.map(function(v){ return v.slice(); });
+    return;
   }
-}
-
-// ── E MapOne ──────────────────────────────────────────────────────────────────
-// Returns [xOut, yOut].  R=1, W=H=W2=0.5 substituted inline.
-
-function eMapOne(myMap, orbi, x, y) {
-  var xOut, yOut;
-  var s3h = 0.8660254037844386;
-  switch (orbi) {
-    case 0: // *442
-      switch(myMap) {
-        case 1: xOut=x;  yOut=y;  break;
-        case 2: xOut=y;  yOut=x;  break;
-        case 3: xOut=-x; yOut=y;  break;
-        case 4: xOut=-y; yOut=x;  break;
-        case 5: xOut=x;  yOut=-y; break;
-        case 6: xOut=y;  yOut=-x; break;
-        case 7: xOut=-x; yOut=-y; break;
-        case 8: xOut=-y; yOut=-x; break;
-      } break;
-    case 1: // 442
-      switch(myMap) {
-        case 1: xOut=x;  yOut=y;  break;
-        case 2: xOut=-y; yOut=x;  break;
-        case 3: xOut=-x; yOut=-y; break;
-        case 4: xOut=y;  yOut=-x; break;
-      } break;
-    case 2: // 4*2  (R=1)
-      switch(myMap) {
-        case 1: xOut=x;   yOut=y;  break;
-        case 2: xOut=-y;  yOut=x;  break;
-        case 3: xOut=-x;  yOut=-y; break;
-        case 4: xOut=y;   yOut=-x; break;
-        case 5: xOut=1-x; yOut=y;  break;
-        case 6: xOut=1+y; yOut=x;  break;
-        case 7: xOut=1+x; yOut=-y; break;
-        case 8: xOut=1-y; yOut=-x; break;
-      } break;
-    case 3: // *632
-      switch(myMap) {
-        case 1:  xOut=x;                    yOut=y;                   break;
-        case 2:  xOut=-x;                   yOut=y;                   break;
-        case 3:  xOut=0.5*x-s3h*y;          yOut=s3h*x+0.5*y;         break;
-        case 4:  xOut=-0.5*x-s3h*y;         yOut=-s3h*x+0.5*y;        break;
-        case 5:  xOut=-0.5*x+s3h*y;         yOut=s3h*x+0.5*y;         break;
-        case 6:  xOut=0.5*x+s3h*y;          yOut=-s3h*x+0.5*y;        break;
-        case 7:  xOut=x;                    yOut=-y;                  break;
-        case 8:  xOut=-x;                   yOut=-y;                  break;
-        case 9:  xOut=0.5*x-s3h*y;          yOut=-s3h*x-0.5*y;        break;
-        case 10: xOut=-0.5*x-s3h*y;         yOut=s3h*x-0.5*y;         break;
-        case 11: xOut=-0.5*x+s3h*y;         yOut=-s3h*x-0.5*y;        break;
-        case 12: xOut=0.5*x+s3h*y;          yOut=s3h*x-0.5*y;         break;
-      } break;
-    case 4: // *333
-      switch(myMap) {
-        case 1: xOut=x;                  yOut=y;              break;
-        case 2: xOut=x;                  yOut=-y;             break;
-        case 3: xOut=-0.5*x-s3h*y;       yOut=s3h*x-0.5*y;   break;
-        case 4: xOut=-0.5*x+s3h*y;       yOut=s3h*x+0.5*y;   break;
-        case 5: xOut=-0.5*x-s3h*y;       yOut=-s3h*x+0.5*y;  break;
-        case 6: xOut=-0.5*x+s3h*y;       yOut=-s3h*x-0.5*y;  break;
-      } break;
-    case 5: // 632
-      switch(myMap) {
-        case 1: xOut=x;                 yOut=y;              break;
-        case 2: xOut=0.5*x-s3h*y;      yOut=s3h*x+0.5*y;    break;
-        case 3: xOut=-0.5*x-s3h*y;     yOut=s3h*x-0.5*y;    break;
-        case 4: xOut=-x;                yOut=-y;             break;
-        case 5: xOut=-0.5*x+s3h*y;     yOut=-s3h*x-0.5*y;   break;
-        case 6: xOut=0.5*x+s3h*y;      yOut=-s3h*x+0.5*y;   break;
-      } break;
-    case 6: // 333
-      switch(myMap) {
-        case 1: xOut=x;              yOut=y;             break;
-        case 2: xOut=-0.5*x-s3h*y;  yOut=s3h*x-0.5*y;  break;
-        case 3: xOut=-0.5*x+s3h*y;  yOut=-s3h*x-0.5*y; break;
-      } break;
-    case 7: // 3*3  (R=1)
-      switch(myMap) {
-        case 1: xOut=x;                        yOut=y;                       break;
-        case 2: xOut=-1-x;                     yOut=y;                       break;
-        case 3: xOut=-0.5*x-s3h*y;             yOut=s3h*x-0.5*y;             break;
-        case 4: xOut=0.5*(1+x)-s3h*y;          yOut=-s3h*(1+x)-0.5*y;        break;
-        case 5: xOut=-0.5*x+s3h*y;             yOut=-s3h*x-0.5*y;            break;
-        case 6: xOut=0.5*(1+x)+s3h*y;          yOut=s3h*(1+x)-0.5*y;         break;
-      } break;
-    case 8: // 22×  (W=H=0.5)
-      switch(myMap) {
-        case 1: xOut=x;         yOut=y;          break;
-        case 2: xOut=0.5-x;     yOut=-0.5+y;     break;
-        case 3: xOut=-x;        yOut=-y;          break;
-        case 4: xOut=-0.5+x;    yOut=0.5-y;       break;
-      } break;
-    case 9: // *2222
-      switch(myMap) {
-        case 1: xOut=x;  yOut=y;  break;
-        case 2: xOut=-x; yOut=y;  break;
-        case 3: xOut=x;  yOut=-y; break;
-        case 4: xOut=-x; yOut=-y; break;
-      } break;
-    case 10: // 22*  (2W=1)
-      switch(myMap) {
-        case 1: xOut=x;   yOut=y;  break;
-        case 2: xOut=-x;  yOut=-y; break;
-        case 3: xOut=1-x; yOut=y;  break;
-        case 4: xOut=1+x; yOut=-y; break;
-      } break;
-    case 11: // **
-      switch(myMap) {
-        case 1: xOut=x;  yOut=y; break;
-        case 2: xOut=-x; yOut=y; break;
-      } break;
-    case 12: // ××  (H=0.5)
-      switch(myMap) {
-        case 1: xOut=x;  yOut=y;       break;
-        case 2: xOut=-x; yOut=0.5+y;   break;
-      } break;
-    case 13: // 2*22  (2W=1)
-      switch(myMap) {
-        case 1: xOut=x;   yOut=y;  break;
-        case 2: xOut=-x;  yOut=-y; break;
-        case 3: xOut=1-x; yOut=y;  break;
-        case 4: xOut=1+x; yOut=-y; break;
-      } break;
-    case 14: // *×
-      switch(myMap) {
-        case 1: xOut=x;  yOut=y; break;
-        case 2: xOut=-x; yOut=y; break;
-      } break;
-    case 15: // 2222
-      switch(myMap) {
-        case 1: xOut=x;  yOut=y;  break;
-        case 2: xOut=-x; yOut=-y; break;
-      } break;
-    case 16: // ○
-      xOut=x; yOut=y;
-      break;
-    default:
-      xOut=x; yOut=y;
-  }
-  return [xOut, yOut];
-}
-
-// ── E drawing ─────────────────────────────────────────────────────────────────
-
-// Draws one shape (line or polygon) with all its symmetry copies + lattice tiles.
-function eDrawShape(ctx, mode, P, Q, color, myFill) {
-  var w = ctx.canvas.width, h = ctx.canvas.height;
-  // approximate range of lattice indices needed
-  var range = Math.ceil(Math.max(w, h) / eScale / Math.min(Math.abs(eTranAx)||1, Math.abs(eTranBy)||1)) + 4;
-
-  for (var map = 1; map <= eNumMaps; map++) {
-    var mp = eMapOne(map, eOrbi, P[0], P[1]);
-    var mq = eMapOne(map, eOrbi, Q[0], Q[1]);
-    for (var ii = -range; ii <= range; ii++) {
-      for (var jj = -range; jj <= range; jj++) {
-        var dx = ii*eTranAx + jj*eTranBx;
-        var dy = ii*eTranAy + jj*eTranBy;
-        var sp = ePt2Screen(mp[0]+dx, mp[1]+dy);
-        var sq = ePt2Screen(mq[0]+dx, mq[1]+dy);
-        // coarse clip: skip if both endpoints far off canvas
-        if (sp[0] < -200 && sq[0] < -200) continue;
-        if (sp[0] > w+200 && sq[0] > w+200) continue;
-        if (sp[1] < -200 && sq[1] < -200) continue;
-        if (sp[1] > h+200 && sq[1] > h+200) continue;
-
-        if (mode === 1) { // line
-          ctx.beginPath();
-          ctx.moveTo(sp[0], sp[1]);
-          ctx.lineTo(sq[0], sq[1]);
-          ctx.strokeStyle = color;
-          ctx.stroke();
-        } else if (mode > 2) { // polygon: P=center, Q=first vertex
-          var angleStep = 2*Math.PI / mode;
-          var pcx = sp[0], pcy = sp[1]; // mapped/translated center
-          var pvx = sq[0]-sp[0], pvy = sq[1]-sp[1]; // first vertex relative to center
-          ctx.beginPath();
-          for (var k = 0; k < mode; k++) {
-            var cx = Math.cos(k*angleStep), sx2 = Math.sin(k*angleStep);
-            var vx = cx*pvx - sx2*pvy + pcx;
-            var vy = cx*pvy + sx2*pvx + pcy;
-            if (k === 0) ctx.moveTo(vx, vy); else ctx.lineTo(vx, vy);
-          }
-          ctx.closePath();
-          if (myFill === 0) {
-            ctx.strokeStyle = color;
-            ctx.stroke();
-          } else {
-            ctx.fillStyle = color;
-            ctx.fill();
-          }
-        }
-      }
-    }
-  }
-}
-
-// Draw the lattice grid (parallelogram cells)
-function eDrawGrid(ctx) {
-  var w = ctx.canvas.width, h = ctx.canvas.height;
-  var range = Math.ceil(Math.max(w, h) / eScale / Math.min(Math.abs(eTranAx)||1, Math.abs(eTranBy)||1)) + 4;
-  ctx.beginPath();
-  ctx.strokeStyle = "#cccccc";
-  ctx.lineWidth = 1;
-  for (var ii = -range; ii <= range+1; ii++) {
-    for (var jj = -range; jj <= range; jj++) {
-      // A-direction lines
-      var p0 = ePt2Screen(ii*eTranAx + jj*eTranBx, ii*eTranAy + jj*eTranBy);
-      var p1 = ePt2Screen((ii+1)*eTranAx + jj*eTranBx, (ii+1)*eTranAy + jj*eTranBy);
-      ctx.moveTo(p0[0], p0[1]);
-      ctx.lineTo(p1[0], p1[1]);
-    }
-    for (var jj = -range; jj <= range; jj++) {
-      // B-direction lines
-      var p0 = ePt2Screen(ii*eTranAx + jj*eTranBx, ii*eTranAy + jj*eTranBy);
-      var p1 = ePt2Screen(ii*eTranAx + (jj+1)*eTranBx, ii*eTranAy + (jj+1)*eTranBy);
-      ctx.moveTo(p0[0], p0[1]);
-      ctx.lineTo(p1[0], p1[1]);
-    }
-  }
-  ctx.stroke();
-}
-
-// ── E Fundamental Domain ──────────────────────────────────────────────────────
-
-function eFDVerts() {
-  var s3h = 0.8660254037844386;  // sqrt(3)/2
-  switch (eOrbi) {
-    case 0:  return [[0,0],[1,0],[1,1]];                // *442  p4m
-    case 1:  return [[0,0],[1,0],[1,1],[0,1]];          // 442   p4
-    case 2:  return [[0,0],[0.5,-0.5],[0.5,0.5]];       // 4*2   p4g
-    case 3:  return [[0,0],[0.75,s3h/2],[1,0],[0.75,-s3h/2]]; // *632  p6m (kite = 2 triangles)
-    case 4:  return [[0,0],[1,0],[0.5,s3h]];            // *333  p3m1
-    case 5:  return [[0,0],[1,0],[0.5,s3h]];            // 632   p6
-    case 6:  return [[0,0],[1,0],[1.5,s3h],[0.5,s3h]];  // 333   p3
-    case 7:  return [[0,0],[1,0],[0.5,s3h]];            // 3*3   p31m
-    case 8:  return [[0,0],[0.5,0],[0.5,0.5],[0,0.5]];  // 22×   pmg
-    case 9:  return [[0,0],[0.5,0],[0.5,0.5],[0,0.5]];  // *2222 pmm
-    case 10: return [[0,0],[1,0],[1,0.5],[0,0.5]];      // 22*   cmm
-    case 11: return [[0,0],[0.5,0],[0.5,1],[0,1]];      // **    pm
-    case 12: return [[0,0],[1,0],[1,0.5],[0,0.5]];      // ××    pg
-    case 13: return [[0,0],[0.5,-0.5],[1,0],[0.5,0.5]]; // 2*22
-    case 14: return [[0,0],[0.5,-1],[0.5,1]];           // *×    cm
-    case 15: return [[0,0],[0.5,0],[0.5,0.5],[0,0.5]];  // 2222  p2
-    case 16: return [[0,0],[1,0],[1,1],[0,1]];          // ○     p1
-    default: return [[0,0],[1,0],[1,1],[0,1]];
-  }
-}
-
-function eDrawFD(ctx) {
-  var w = ctx.canvas.width, h = ctx.canvas.height;
-  var range = Math.ceil(Math.max(w, h) / eScale / Math.min(Math.abs(eTranAx)||1, Math.abs(eTranBy)||1)) + 4;
-  var verts0 = eFDVerts();
-  ctx.lineWidth = 0.5;
-  for (var map = 1; map <= eNumMaps; map++) {
-    for (var ii = -range; ii <= range; ii++) {
-      for (var jj = -range; jj <= range; jj++) {
-        var dx = ii*eTranAx + jj*eTranBx;
-        var dy = ii*eTranAy + jj*eTranBy;
-        var pts = [];
-        for (var k = 0; k < verts0.length; k++) {
-          var mv = eMapOne(map, eOrbi, verts0[k][0], verts0[k][1]);
-          pts.push(ePt2Screen(mv[0]+dx, mv[1]+dy));
-        }
-        var minX = pts[0][0], maxX = pts[0][0], minY = pts[0][1], maxY = pts[0][1];
-        for (var k = 1; k < pts.length; k++) {
-          if (pts[k][0] < minX) minX = pts[k][0];
-          if (pts[k][0] > maxX) maxX = pts[k][0];
-          if (pts[k][1] < minY) minY = pts[k][1];
-          if (pts[k][1] > maxY) maxY = pts[k][1];
-        }
-        if (maxX < -10 || minX > w+10 || maxY < -10 || minY > h+10) continue;
-        ctx.beginPath();
-        ctx.moveTo(pts[0][0], pts[0][1]);
-        for (var k = 1; k < pts.length; k++) ctx.lineTo(pts[k][0], pts[k][1]);
-        ctx.closePath();
-        if (map === 1 && ii === 0 && jj === 0) {
-          ctx.fillStyle = "rgba(255,240,200,0.8)";
-          ctx.fill();
-          ctx.strokeStyle = "#aaa";
-          ctx.stroke();
-        } else {
-          ctx.strokeStyle = "#ddd";
-          ctx.stroke();
-        }
-      }
-    }
-  }
-}
-
-// ── drawE(ctx, c) ─────────────────────────────────────────────────────────────
-// Renders the complete E scene.  stack[] items: [mode, P, Q, color, fill]
-// where P,Q are [x,y] native E coordinates.
-
-function drawE(ctx, c) {
-  if (gridMode) {
-    eDrawFD(ctx);
-    eDrawGrid(ctx);
-  }
-
-  ctx.lineWidth = 1;
-  stack.forEach(function(sh) {
-    eDrawShape(ctx, sh[0], sh[1], sh[2], sh[3], sh[4]);
-  });
-
-  // preview current shape
-  if (ePosA !== null && ePosB !== null) {
-    eDrawShape(ctx, mode, ePosA, ePosB, color, fill);
-  }
-
-  // edit mode: show control points
   if (mode === 0) {
-    var boxSize = 7;
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = "red";
-    stack.forEach(function(sh) {
-      var sp = ePt2Screen(sh[1][0], sh[1][1]);
-      var sq = ePt2Screen(sh[2][0], sh[2][1]);
-      ctx.beginPath();
-      ctx.rect(sp[0]-boxSize, sp[1]-boxSize, 2*boxSize+1, 2*boxSize+1);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.rect(sq[0]-boxSize, sq[1]-boxSize, 2*boxSize+1, 2*boxSize+1);
-      ctx.stroke();
+    sEditShapeIdx = -1;
+    for (var i = 0; i < stack.length; i++) {
+      var sp = sVect2screen(stack[i][1]);
+      var sq = sVect2screen(stack[i][2]);
+      if (Math.abs(sx-sp[0]) < boxSize && Math.abs(sy-sp[1]) < boxSize) { sEditShapeIdx = i; sEditPtIdx = 1; break; }
+      if (Math.abs(sx-sq[0]) < boxSize && Math.abs(sy-sq[1]) < boxSize) { sEditShapeIdx = i; sEditPtIdx = 2; break; }
+    }
+    return;
+  }
+  sPosA3d = pt3; sPosB3d = pt3;
+  draw();
+}
+
+function sMouseMoved(sx, sy, shiftKey) {
+  var pt3 = sScreen2vect(sx, sy, shiftKey);
+  if (mode === -1 && sPanPosA) {
+    var diff = [(sx - sPanPosA[0]) / scrRadius, -(sy - sPanPosA[1]) / scrRadius, 0];
+    var len  = vectLeng(diff);
+    if (len < 1e-10) return;
+    var axis = cross(diff, [0,0,1]);
+    var myMatrix = sRotMat(axis, len);
+    stack = sBackupStack.map(function(elem) {
+      return [elem[0], multVectMat(elem[1], myMatrix), multVectMat(elem[2], myMatrix), elem[3], elem[4]];
     });
+    sSymVects = sBackupSymVects.map(function(v){ return multVectMat(v, myMatrix); });
+    draw();
+    return;
+  }
+  if (mode === 0 && sEditShapeIdx >= 0) {
+    stack[sEditShapeIdx][sEditPtIdx] = pt3;
+    draw();
+    return;
+  }
+  if (sPosA3d.length > 0) {
+    sPosB3d = pt3;
+    draw();
+  }
+}
+
+function sMouseReleased(sx, sy, shiftKey) {
+  var pt3 = sScreen2vect(sx, sy, shiftKey);
+  if (mode === -1) { sPanPosA = null; return; }
+  if (mode === 0)  { sEditShapeIdx = -1; draw(); return; }
+  if (sPosA3d.length > 0) {
+    sPosB3d = pt3;
+    undoStack = [];
+    stack.push([mode, sPosA3d.slice(), sPosB3d.slice(), color, fill]);
+    sPosA3d = []; sPosB3d = [];
+    draw();
   }
 }

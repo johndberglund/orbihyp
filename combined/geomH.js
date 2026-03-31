@@ -1,5 +1,5 @@
 // geomH.js — Hyperbolic geometry for the combined orbifold app.
-// Extracted from deatonC.js.  Provides hReDo(), drawH(ctx,c),
+// Extracted from deatonC.js.  Provides hReDo(), hDraw(ctx,c),
 // hMousePressed(sx,sy,shiftKey), hMouseMoved(sx,sy), hMouseReleased(sx,sy).
 
 // ── Constants & math helpers ──────────────────────────────────────────────────
@@ -42,7 +42,7 @@ var maxT;
 
 function hDot(P, Q) { return -P[0]*Q[0] + P[1]*Q[1] + P[2]*Q[2]; }
 
-function vectType(P) {
+function hVectType(P) {
   let inner = hDot(P, P);
   if (Math.abs(inner) < epsilon) return 0;
   return inner < 0 ? -1 : 1;
@@ -50,82 +50,53 @@ function vectType(P) {
 
 function hNorm(P) {
   let denom;
-  if (vectType(P) === 0) { denom = 1/P[0]/Math.sqrt(2); }
+  if (hVectType(P) === 0) { denom = 1/P[0]/Math.sqrt(2); }
   else { denom = Math.sqrt(Math.abs(hDot(P, P))); }
   let s = P[0] < 0 ? -1 : 1;
   return [P[0]*s/denom, P[1]*s/denom, P[2]*s/denom];
 }
 
-function normHDot(P, Q) {
+function hDotNorm(P, Q) {
   return Math.abs(hDot(P, Q)) / Math.sqrt(Math.abs(hDot(P,P) * hDot(Q,Q)));
 }
 
 function hDist(P, Q) {
-  let N = normHDot(P, Q);
+  let N = hDotNorm(P, Q);
   if (N < 1 && N + epsilon > 1) N = 1;
   return Math.acosh(N);
 }
 
-function vectPlus(P, Q)   { return [P[0]+Q[0], P[1]+Q[1], P[2]+Q[2]]; }
-function vectMinus(P, Q)  { return [P[0]-Q[0], P[1]-Q[1], P[2]-Q[2]]; }
-function scalarVect(s, V) { return [V[0]*s, V[1]*s, V[2]*s]; }
-function tRef(P)          { return [-P[0], P[1], P[2]]; }
+function hTRef(P)          { return [-P[0], P[1], P[2]]; }
 
-function crossProd(P, Q) {
-  return [P[1]*Q[2]-P[2]*Q[1], P[2]*Q[0]-P[0]*Q[2], P[0]*Q[1]-P[1]*Q[0]];
-}
-
-function points2Line(P, Q) {
+function hPoints2Line(P, Q) {
   let dist = hDist(P, Q);
-  return scalarVect(1/Math.sinh(dist), tRef(crossProd(P, Q)));
+  return scalarVect(1/Math.sinh(dist), hTRef(cross(P, Q)));
 }
 
-function reflPtOverLine(P, L) {
-  return vectMinus(P, scalarVect(-2*hDot(P,L)/hDot(L,L), L));
+//function reflPtOverLine(P, L) {
+//  return vectDiff(P, scalarVect(-2*hDot(P,L)/hDot(L,L), L));
+//}
+
+function hFootOfPerp(P, L) {
+  return hNorm(vectSum(P, scalarVect(-hDot(P,L)/hDot(L,L), L)));
 }
 
-function footOfPerp(P, L) {
-  return hNorm(vectPlus(P, scalarVect(-hDot(P,L)/hDot(L,L), L)));
-}
+function hMidPoint(P, Q) { return hNorm(vectSum(P, Q)); }
 
-function midPoint(P, Q) { return hNorm(vectPlus(P, Q)); }
-
-function multMatVect(mat, vect) {
-  return [
-    vect[0]*mat[0][0] + vect[1]*mat[0][1] + vect[2]*mat[0][2],
-    vect[0]*mat[1][0] + vect[1]*mat[1][1] + vect[2]*mat[1][2],
-    vect[0]*mat[2][0] + vect[1]*mat[2][1] + vect[2]*mat[2][2]
-  ];
-}
-
-function multMatMat(M, N) {
-  let L = [];
-  for (let i = 0; i < 3; i++) {
-    let row = [];
-    for (let j = 0; j < 3; j++) {
-      let e = 0;
-      for (let k = 0; k < 3; k++) e += M[i][k]*N[k][j];
-      row.push(e);
-    }
-    L.push(row);
-  }
-  return L;
-}
-
-function reorthogLorentz(M) {
-  let c0 = [M[0][0], M[1][0], M[2][0]];
-  let c1 = [M[0][1], M[1][1], M[2][1]];
-  c0 = scalarVect(1 / Math.sqrt(-hDot(c0, c0)), c0);
-  c1 = vectPlus(c1, scalarVect(hDot(c1, c0), c0));
-  c1 = scalarVect(1 / Math.sqrt(hDot(c1, c1)), c1);
-  let c2 = tRef(crossProd(c0, c1));
-  if (matDet(M) < 0) c2 = scalarVect(-1, c2);
-  return [
-    [c0[0], c1[0], c2[0]],
-    [c0[1], c1[1], c2[1]],
-    [c0[2], c1[2], c2[2]]
-  ];
-}
+//function reorthogLorentz(M) {
+//  let c0 = [M[0][0], M[1][0], M[2][0]];
+//  let c1 = [M[0][1], M[1][1], M[2][1]];
+//  c0 = scalarVect(1 / Math.sqrt(-hDot(c0, c0)), c0);
+//  c1 = vectSum(c1, scalarVect(hDot(c1, c0), c0));
+//  c1 = scalarVect(1 / Math.sqrt(hDot(c1, c1)), c1);
+//  let c2 = hTRef(cross(c0, c1));
+//  if (matDet(M) < 0) c2 = scalarVect(-1, c2);
+//  return [
+//    [c0[0], c1[0], c2[0]],
+//    [c0[1], c1[1], c2[1]],
+//    [c0[2], c1[2], c2[2]]
+//  ];
+//}
 
 function hReflMat(line) {
   let mat = [], denom = hDot(line, line);
@@ -143,7 +114,7 @@ function hReflMat(line) {
 }
 
 function hFlipMat(P, Q) {
-  let diff = vectMinus(P, Q);
+  let diff = vectDiff(P, Q);
   diff = scalarVect(1/Math.sqrt(hDot(diff,diff)), diff);
   let mat = [];
   for (let i = 0; i < 3; i++) {
@@ -159,57 +130,57 @@ function hFlipMat(P, Q) {
   return mat;
 }
 
-function rotOrigMat(theta) {
+function hRotOrigMat(theta) {
   return [[1,0,0],[0,Math.cos(theta),-Math.sin(theta)],[0,Math.sin(theta),Math.cos(theta)]];
 }
 
-function rotMat(P, theta) {
-  if (hDist(P, [1,0,0]) < epsilon) return rotOrigMat(theta);
+function hRotMat(P, theta) {
+  if (hDist(P, [1,0,0]) < epsilon) return hRotOrigMat(theta);
   let mat1 = hFlipMat(P, [1,0,0]);
-  let mat2 = rotOrigMat(-theta);
+  let mat2 = hRotOrigMat(-theta);
   return multMatMat(mat1, multMatMat(mat2, mat1));
 }
 
-function transOrigMat(P) {
+function hTransOrigMat(P) {
   return [[P[0],P[1],P[2]],
           [P[1], P[1]*P[1]/(P[0]+1)+1, P[1]*P[2]/(P[0]+1)],
           [P[2], P[1]*P[2]/(P[0]+1),   P[2]*P[2]/(P[0]+1)+1]];
 }
 
-function transMat(P, Q) {
+function hTransMat(P, Q) {
   let pRefl = JSON.stringify(P) === "[1,0,0]"
     ? identity
     : hFlipMat(P, [1,0,0]);
   let newQ = multMatVect(pRefl, Q);
-  let trans1 = transOrigMat(newQ);
+  let trans1 = hTransOrigMat(newQ);
   return multMatMat(pRefl, multMatMat(trans1, pRefl));
 }
 
-function isomSeg2SegFlip(P, Q, R, S) {
-  return multMatMat(hReflMat(points2Line(R, S)), isomSeg2Seg(P, Q, R, S));
+function hIsomSeg2SegFlip(P, Q, R, S) {
+  return multMatMat(hReflMat(hPoints2Line(R, S)), hIsomSeg2Seg(P, Q, R, S));
 }
 
-function isomSeg2Seg(P, Q, R, S, twist=0) {
-  if (Math.abs(normHDot(P,Q) - normHDot(R,S)) >= epsilon) return "Error. Don't match!";
+function hIsomSeg2Seg(P, Q, R, S, twist=0) {
+  if (Math.abs(hDotNorm(P,Q) - hDotNorm(R,S)) >= epsilon) return "Error. Don't match!";
   if (twist !== 0) {
     let d = hDist(R, S);
-    let V = scalarVect(1/Math.sinh(d), vectMinus(S, scalarVect(Math.cosh(d), R)));
+    let V = scalarVect(1/Math.sinh(d), vectDiff(S, scalarVect(Math.cosh(d), R)));
     let td = twist * d;
-    R = vectPlus(scalarVect(Math.cosh(td), R),     scalarVect(Math.sinh(td), V));
-    S = vectPlus(scalarVect(Math.cosh(td + d), R), scalarVect(Math.sinh(td + d), V));
+    R = vectSum(scalarVect(Math.cosh(td), R),     scalarVect(Math.sinh(td), V));
+    S = vectSum(scalarVect(Math.cosh(td + d), R), scalarVect(Math.sinh(td + d), V));
   }
   let reflMat1, reflMat2;
   if (hDist(P, R) < epsilon) {
     if (hDist(Q, S) < epsilon) return identity;
     reflMat1 = hFlipMat(Q, S);
-    reflMat2 = hReflMat(points2Line(R, S));
+    reflMat2 = hReflMat(hPoints2Line(R, S));
     return multMatMat(reflMat2, reflMat1);
   }
-  reflMat1 = hReflMat(vectMinus(P, R));
+  reflMat1 = hReflMat(vectDiff(P, R));
   let QPrime = multMatVect(reflMat1, Q);
   reflMat2 = hDist(S, QPrime) < epsilon * 1000
-    ? hReflMat(points2Line(R, S))
-    : hReflMat(vectMinus(S, QPrime));
+    ? hReflMat(hPoints2Line(R, S))
+    : hReflMat(vectDiff(S, QPrime));
   return multMatMat(reflMat2, reflMat1);
 }
 
@@ -223,12 +194,8 @@ function hTriangleArea(A, B, C) {
                  - Math.acos(Math.max(-1, Math.min(1, cosC)));
 }
 
-function matDet(M) {
-  return M[0][0]*(M[1][1]*M[2][2] - M[1][2]*M[2][1])
-       - M[0][1]*(M[1][0]*M[2][2] - M[1][2]*M[2][0])
-       + M[0][2]*(M[1][0]*M[2][1] - M[1][1]*M[2][0]);
-}
-
+// this seems to require something special of the matrix involved.
+//***
 function invMat(M) {
   return [
     [ M[0][0], -M[1][0], -M[2][0]],
@@ -237,70 +204,71 @@ function invMat(M) {
   ];
 }
 
+//***
 function getInvMove() { return invMat(moveMat); }
 
 // ── Triangle solvers ──────────────────────────────────────────────────────────
 
-function solve3Ang(alpha, beta, gamma) {
+function hSolve3Ang(alpha, beta, gamma) {
   beta = -beta;
   let sideC = [0,1,0];
   let sideB = [0, Math.cos(alpha), Math.sin(alpha)];
   let sideAY = (Math.cos(gamma) + Math.cos(alpha)*Math.cos(beta)) / Math.sin(alpha);
   let sideAX = Math.cos(beta);
   let sideA = [-Math.sqrt(sideAX*sideAX + sideAY*sideAY - 1), sideAX, -sideAY];
-  return [hNorm(crossProd(tRef(sideB),tRef(sideC))),
-          hNorm(crossProd(tRef(sideC),tRef(sideA))),
-          hNorm(crossProd(tRef(sideA),tRef(sideB)))];
+  return [hNorm(cross(hTRef(sideB),hTRef(sideC))),
+          hNorm(cross(hTRef(sideC),hTRef(sideA))),
+          hNorm(cross(hTRef(sideA),hTRef(sideB)))];
 }
 
-function solve2Ang(alpha, beta, gamma) {
+function hSolve2Ang(alpha, beta, gamma) {
   beta = -beta;
   let sideC = [0,1,0];
   let sideB = [Math.sinh(alpha), Math.cosh(alpha), 0];
   let sideAT = (Math.cos(gamma) + Math.cosh(alpha)*Math.cos(beta)) / Math.sinh(alpha);
   let sideAX = Math.cos(beta);
   let sideA = [sideAT, sideAX, Math.sqrt(-sideAX*sideAX + sideAT*sideAT + 1)];
-  let segAlpha = hNorm(crossProd(tRef(sideB),tRef(sideC)));
-  let vertBeta  = hNorm(crossProd(tRef(sideC),tRef(sideA)));
-  let vertGamma = hNorm(crossProd(tRef(sideA),tRef(sideB)));
-  let vertAlphaC = hNorm(crossProd(tRef(segAlpha),tRef(sideC)));
-  let vertAlphaB = hNorm(crossProd(tRef(segAlpha),tRef(sideB)));
+  let segAlpha = hNorm(cross(hTRef(sideB),hTRef(sideC)));
+  let vertBeta  = hNorm(cross(hTRef(sideC),hTRef(sideA)));
+  let vertGamma = hNorm(cross(hTRef(sideA),hTRef(sideB)));
+  let vertAlphaC = hNorm(cross(hTRef(segAlpha),hTRef(sideC)));
+  let vertAlphaB = hNorm(cross(hTRef(segAlpha),hTRef(sideB)));
   return [vertAlphaB, vertAlphaC, vertBeta, vertGamma];
 }
 
-function solve1Ang(alpha, beta, gamma) {
+function hSolve1Ang(alpha, beta, gamma) {
   beta = -beta;
   let sideC = [0,1,0];
   let sideB = [Math.sinh(alpha), Math.cosh(alpha), 0];
   let sideAT = (Math.cos(gamma) + Math.cosh(alpha)*Math.cosh(beta)) / Math.sinh(alpha);
   let sideAX = Math.cosh(beta);
   let sideA = [sideAT, sideAX, Math.sqrt(-sideAX*sideAX + sideAT*sideAT + 1)];
-  let segAlpha = hNorm(crossProd(tRef(sideB),tRef(sideC)));
-  let segBeta  = hNorm(crossProd(tRef(sideC),tRef(sideA)));
-  let vertGamma  = hNorm(crossProd(tRef(sideA),tRef(sideB)));
-  let vertAlphaC = hNorm(crossProd(tRef(segAlpha),tRef(sideC)));
-  let vertAlphaB = hNorm(crossProd(tRef(segAlpha),tRef(sideB)));
-  let vertBetaA  = hNorm(crossProd(tRef(segBeta),tRef(sideA)));
-  let vertBetaC  = hNorm(crossProd(tRef(segBeta),tRef(sideC)));
+  let segAlpha = hNorm(cross(hTRef(sideB),hTRef(sideC)));
+  let segBeta  = hNorm(cross(hTRef(sideC),hTRef(sideA)));
+  let vertGamma  = hNorm(cross(hTRef(sideA),hTRef(sideB)));
+  let vertAlphaC = hNorm(cross(hTRef(segAlpha),hTRef(sideC)));
+  let vertAlphaB = hNorm(cross(hTRef(segAlpha),hTRef(sideB)));
+  let vertBetaA  = hNorm(cross(hTRef(segBeta),hTRef(sideA)));
+  let vertBetaC  = hNorm(cross(hTRef(segBeta),hTRef(sideC)));
   return [vertAlphaB, vertAlphaC, vertBetaC, vertBetaA, vertGamma];
 }
 
-function solve0Ang(alpha, beta, gamma) {
+function hSolve0Ang(alpha, beta, gamma) {
   beta = -beta;
   let sideC = [0,1,0];
   let sideB = [Math.sinh(alpha), Math.cosh(alpha), 0];
   let sideAT = (Math.cosh(gamma) + Math.cosh(alpha)*Math.cosh(beta)) / Math.sinh(alpha);
   let sideAX = Math.cosh(beta);
   let sideA = [sideAT, sideAX, Math.sqrt(-sideAX*sideAX + sideAT*sideAT + 1)];
-  let segAlpha = hNorm(crossProd(tRef(sideB),tRef(sideC)));
-  let segBeta  = hNorm(crossProd(tRef(sideC),tRef(sideA)));
-  let segGamma = hNorm(crossProd(tRef(sideA),tRef(sideB)));
-  return [hNorm(crossProd(tRef(segAlpha),tRef(sideB))),
-          hNorm(crossProd(tRef(segAlpha),tRef(sideC))),
-          hNorm(crossProd(tRef(segBeta), tRef(sideC))),
-          hNorm(crossProd(tRef(segBeta), tRef(sideA))),
-          hNorm(crossProd(tRef(segGamma),tRef(sideA))),
-          hNorm(crossProd(tRef(segGamma),tRef(sideB)))];
+  let segAlpha = hNorm(cross(hTRef(sideB),hTRef(sideC)));
+  let segBeta  = hNorm(cross(hTRef(sideC),hTRef(sideA)));
+  let segGamma = hNorm(cross(hTRef(sideA),hTRef(sideB)));
+  return [hNorm(cross(hTRef(segAlpha),hTRef(sideB))),
+          hNorm(cross(hTRef(segAlpha),hTRef(sideC))),
+          hNorm(cross(hTRef(segBeta), hTRef(sideC))),
+          hNorm(cross(hTRef(segBeta), hTRef(sideA))),
+          hNorm(cross(hTRef(segGamma),hTRef(sideA))),
+          hNorm(cross(hTRef(segGamma),hTRef(sideB)))];
 }
 
 // ── Atom builders ─────────────────────────────────────────────────────────────
@@ -312,30 +280,30 @@ function getAtom(thisType, thisParamList) {
 }
 
 function getSheet(thisType, thisParamList) {
-  if (thisType === "S6") return solve0Ang(thisParamList[0], thisParamList[1], thisParamList[2]);
-  if (thisType === "S5") return solve1Ang(thisParamList[0], thisParamList[1], Math.PI/thisParamList[2]);
-  if (thisType === "S4") return solve2Ang(thisParamList[0], Math.PI/thisParamList[1], Math.PI/thisParamList[2]);
-  return solve3Ang(Math.PI/thisParamList[0], Math.PI/thisParamList[1], Math.PI/thisParamList[2]);
+  if (thisType === "S6") return hSolve0Ang(thisParamList[0], thisParamList[1], thisParamList[2]);
+  if (thisType === "S5") return hSolve1Ang(thisParamList[0], thisParamList[1], Math.PI/thisParamList[2]);
+  if (thisType === "S4") return hSolve2Ang(thisParamList[0], Math.PI/thisParamList[1], Math.PI/thisParamList[2]);
+  return hSolve3Ang(Math.PI/thisParamList[0], Math.PI/thisParamList[1], Math.PI/thisParamList[2]);
 }
 
 function getPCase(thisType, thisParamList) {
   if (thisType === "C3") {
     let a1 = Math.PI/thisParamList[0], a2 = Math.PI/thisParamList[1];
-    return solve3Ang(a1*2, a2/2, a2/2);
+    return hSolve3Ang(a1*2, a2/2, a2/2);
   }
   if (thisType === "C4") {
     let s1 = thisParamList[0]/2, a1 = Math.PI/thisParamList[1];
-    return solve2Ang(s1*2, a1/2, a1/2);
+    return hSolve2Ang(s1*2, a1/2, a1/2);
   }
   if (thisType === "C5") {
     let a1 = 2*Math.PI/thisParamList[0], s1 = thisParamList[1];
     let s2 = Math.asinh(Math.sqrt((1+Math.cos(a1))/(Math.cosh(s1)-1)));
-    return solve1Ang(s2, s2, a1);
+    return hSolve1Ang(s2, s2, a1);
   }
   // C6
   let s1 = thisParamList[0], s3 = thisParamList[1];
   let s2 = Math.asinh(Math.sqrt((Math.cosh(s1)+1)/(Math.cosh(s3)-1)));
-  return solve0Ang(s2, s2, s1);
+  return hSolve0Ang(s2, s2, s1);
 }
 
 function getPillow(thisType, thisParamList) {
@@ -344,60 +312,60 @@ function getPillow(thisType, thisParamList) {
 
   if (thisType === "P3") {
     angle1 = Math.PI/thisParamList[0]; angle2 = Math.PI/thisParamList[1]; angle3 = Math.PI/thisParamList[2];
-    shape1 = solve3Ang(angle1, angle3, angle2);
-    shape2 = solve3Ang(angle1, angle2, angle3);
-    myMat = isomSeg2Seg(shape2[0], shape2[2], shape1[0], shape1[1]);
+    shape1 = hSolve3Ang(angle1, angle3, angle2);
+    shape2 = hSolve3Ang(angle1, angle2, angle3);
+    myMat = hIsomSeg2Seg(shape2[0], shape2[2], shape1[0], shape1[1]);
     newShape2 = shape2.map(v => multMatVect(myMat, v));
     myShape = [newShape2[0], newShape2[1], newShape2[2], shape1[2]];
-    mid1 = midPoint(myShape[3], myShape[0]);
-    myMat = isomSeg2Seg(myShape[2], myShape[3], myShape[2], myShape[1]);
+    mid1 = hhMidPoint(myShape[3], myShape[0]);
+    myMat = hIsomSeg2Seg(myShape[2], myShape[3], myShape[2], myShape[1]);
     vert1 = multMatVect(myMat, mid1);
     myShape = [myShape[0], myShape[1], vert1, myShape[2], mid1];
-    mid1 = midPoint(myShape[0], myShape[1]);
+    mid1 = hMidPoint(myShape[0], myShape[1]);
     myShape = [myShape[0], mid1, myShape[1], myShape[2], myShape[3], myShape[4]];
   } else if (thisType === "P4") {
     side1 = thisParamList[0]/2; angle2 = Math.PI/thisParamList[1]; angle3 = Math.PI/thisParamList[2];
-    shape1 = solve2Ang(side1, angle2, angle3);
-    shape2 = solve2Ang(side1, angle3, angle2);
-    myMat = isomSeg2Seg(shape2[0], shape2[3], shape1[1], shape1[2]);
+    shape1 = hSolve2Ang(side1, angle2, angle3);
+    shape2 = hSolve2Ang(side1, angle3, angle2);
+    myMat = hIsomSeg2Seg(shape2[0], shape2[3], shape1[1], shape1[2]);
     newShape2 = shape2.map(v => multMatVect(myMat, v));
     myShape = [newShape2[1], newShape2[2], newShape2[3], shape1[3], shape1[0]];
-    mid1 = midPoint(myShape[3], myShape[4]);
-    myMat = isomSeg2Seg(myShape[2], myShape[3], myShape[2], myShape[1]);
+    mid1 = hMidPoint(myShape[3], myShape[4]);
+    myMat = hIsomSeg2Seg(myShape[2], myShape[3], myShape[2], myShape[1]);
     vert1 = multMatVect(myMat, mid1);
     myShape = [myShape[4], myShape[0], myShape[1], vert1, myShape[2], mid1];
-    mid1 = midPoint(myShape[1], myShape[2]);
+    mid1 = hMidPoint(myShape[1], myShape[2]);
     myShape = [myShape[0], myShape[1], mid1, myShape[2], myShape[3], myShape[4], myShape[5]];
   } else if (thisType === "P5") {
     side1 = thisParamList[0]/2; side2 = thisParamList[1]/2; angle3 = Math.PI/thisParamList[2];
-    shape1 = solve1Ang(side1, side2, angle3);
-    shape2 = solve1Ang(side2, side1, angle3);
-    myMat = isomSeg2Seg(shape2[3], shape2[4], shape1[0], shape1[4]);
+    shape1 = hSolve1Ang(side1, side2, angle3);
+    shape2 = hSolve1Ang(side2, side1, angle3);
+    myMat = hIsomSeg2Seg(shape2[3], shape2[4], shape1[0], shape1[4]);
     newShape2 = shape2.map(v => multMatVect(myMat, v));
     myShape = [shape1[1], shape1[2], shape1[3], shape1[4], newShape2[0], newShape2[1], newShape2[2]];
-    mid1 = midPoint(myShape[5], myShape[6]);
-    myMat = isomSeg2Seg(myShape[3], myShape[4], myShape[3], myShape[2]);
+    mid1 = hMidPoint(myShape[5], myShape[6]);
+    myMat = hIsomSeg2Seg(myShape[3], myShape[4], myShape[3], myShape[2]);
     vert1 = multMatVect(myMat, mid1);
     vert2 = multMatVect(myMat, myShape[5]);
     myShape = [myShape[6], myShape[0], myShape[1], vert2, vert1, myShape[3], mid1];
-    mid1 = midPoint(myShape[1], myShape[2]);
+    mid1 = hMidPoint(myShape[1], myShape[2]);
     myShape = [myShape[0], myShape[1], mid1, myShape[2], myShape[3], myShape[4], myShape[5], myShape[6]];
   } else { // P6
     side1 = thisParamList[0]/2; side2 = thisParamList[1]/2; side3 = thisParamList[2]/2;
-    shape1 = solve0Ang(side1, side2, side3);
-    shape2 = solve0Ang(side2, side1, side3);
-    myMat = isomSeg2Seg(shape2[1], shape2[2], shape1[2], shape1[1]);
+    shape1 = hSolve0Ang(side1, side2, side3);
+    shape2 = hSolve0Ang(side2, side1, side3);
+    myMat = hIsomSeg2Seg(shape2[1], shape2[2], shape1[2], shape1[1]);
     newShape2 = shape2.map(v => multMatVect(myMat, v));
     myShape = [newShape2[3], newShape2[4], newShape2[5], newShape2[0], shape1[3], shape1[4], shape1[5], shape1[0]];
-    mid1 = midPoint(myShape[6], myShape[7]);
-    myMat = isomSeg2Seg(myShape[4], myShape[5], myShape[3], myShape[2]);
+    mid1 = hMidPoint(myShape[6], myShape[7]);
+    myMat = hIsomSeg2Seg(myShape[4], myShape[5], myShape[3], myShape[2]);
     vert1 = multMatVect(myMat, mid1);
     vert2 = multMatVect(myMat, myShape[6]);
     myShape = [myShape[7], myShape[0], myShape[1], vert2, vert1, myShape[3], myShape[4], mid1];
-    let myLine = points2Line(myShape[5], myShape[6]);
-    myShape[5] = footOfPerp(myShape[4], myLine);
-    myShape[6] = footOfPerp(myShape[7], myLine);
-    mid1 = midPoint(myShape[1], myShape[2]);
+    let myLine = hPoints2Line(myShape[5], myShape[6]);
+    myShape[5] = hFootOfPerp(myShape[4], myLine);
+    myShape[6] = hFootOfPerp(myShape[7], myLine);
+    mid1 = hMidPoint(myShape[1], myShape[2]);
     myShape = [myShape[0], myShape[1], mid1, myShape[2], myShape[3], myShape[4], myShape[5], myShape[6], myShape[7]];
   }
   return myShape;
@@ -736,10 +704,10 @@ function buildAllGenMats() {
     if (genMaps[i] === null) { allGenMats.push(null); continue; }
     let [j, orient] = genMaps[i];
     let Pi = originFD[i], Qi = originFD[(i + 1) % n];
-    if (orient === 0) { allGenMats.push(hReflMat(points2Line(Pi, Qi))); continue; }
+    if (orient === 0) { allGenMats.push(hReflMat(hPoints2Line(Pi, Qi))); continue; }
     if (orient === 1) {
       let Pj = originFD[j], Qj = originFD[(j + 1) % n];
-      allGenMats.push(isomSeg2Seg(Pi, Qi, Qj, Pj)); continue;
+      allGenMats.push(hIsomSeg2Seg(Pi, Qi, Qj, Pj)); continue;
     }
     let stepType = 0, twist = 0;
     let [atomIdx, vertIdx] = borderFD[i];
@@ -757,15 +725,15 @@ function buildAllGenMats() {
     }
     if (j !== i) {
       let Pj = originFD[j], Qj = originFD[(j + 1) % n];
-      allGenMats.push(isomSeg2Seg(Pi, Qi, Qj, Pj, twist));
+      allGenMats.push(hIsomSeg2Seg(Pi, Qi, Qj, Pj, twist));
     } else {
       switch (stepType) {
-        case 4: case 5: allGenMats.push(isomSeg2Seg(Pi, Qi, Qi, Pi)); break;
-        case 6: allGenMats.push(hReflMat(points2Line(Pi, Qi))); break;
+        case 4: case 5: allGenMats.push(hIsomSeg2Seg(Pi, Qi, Qi, Pi)); break;
+        case 6: allGenMats.push(hReflMat(hPoints2Line(Pi, Qi))); break;
         case 2: {
-          let mid1 = midPoint(Pi, Qi);
-          allGenMats.push(isomSeg2SegFlip(Pi, mid1, mid1, Qi));
-          allGenMats.push(isomSeg2SegFlip(Qi, mid1, mid1, Pi));
+          let mid1 = hMidPoint(Pi, Qi);
+          allGenMats.push(hIsomSeg2SegFlip(Pi, mid1, mid1, Qi));
+          allGenMats.push(hIsomSeg2SegFlip(Qi, mid1, mid1, Pi));
           break;
         }
         default: allGenMats.push(null);
@@ -837,7 +805,7 @@ function buildOriginFDCent() {
     let B = originFD[i], C = originFD[i + 1];
     let area = hTriangleArea(A, B, C);
     if (!isFinite(area) || area < epsilon) continue;
-    let triCent = hNorm(vectPlus(vectPlus(A, B), C));
+    let triCent = hNorm(vectSum(vectSum(A, B), C));
     cx += area * triCent[0]; cy += area * triCent[1]; cz += area * triCent[2];
     totalArea += area;
   }
@@ -881,7 +849,7 @@ function buildAtomPtList() {
       let anchorStart   = anchorEntry[1];
       let anchorEnd     = (anchorStart + 1) % anchorNVerts;
       let twist = params[j][1] ?? 0;
-      let mat = isomSeg2Seg(
+      let mat = hIsomSeg2Seg(
         nextShape[newStart], nextShape[newEnd],
         atomPtList[anchorAtomIdx][anchorEnd], atomPtList[anchorAtomIdx][anchorStart],
         twist
@@ -897,7 +865,7 @@ function rebuildGeom() {
   buildParamPtList();
   buildOriginFD();
   buildOriginFDCent();
-  recenterMat = transMat(originFDCent, [1, 0, 0]);
+  recenterMat = hTransMat(originFDCent, [1, 0, 0]);
   originFD = originFD.map(p => multMatVect(recenterMat, p));
   originFDCent = multMatVect(recenterMat, originFDCent);
   for (let j = 1; j < paramPtList.length; j++) {
@@ -942,7 +910,7 @@ function screen2Pt(scrPt, zoom) {
 function divSeg(P, Q, n) {
   let myList = [];
   for (let i = 0; i < n+2; i++) {
-    myList.push(hNorm(vectPlus(scalarVect(i/(n+1), Q), scalarVect((n+1-i)/(n+1), P))));
+    myList.push(hNorm(vectSum(scalarVect(i/(n+1), Q), scalarVect((n+1-i)/(n+1), P))));
   }
   return myList;
 }
@@ -956,8 +924,8 @@ function geodTangentScreen(Xv, Xp) {
 }
 
 function addGeodPiece(ctx, s1, s2, N, T) {
-  function X(s)  { return vectPlus(scalarVect(Math.cosh(s), N), scalarVect(Math.sinh(s), T)); }
-  function Xp(s) { return vectPlus(scalarVect(Math.sinh(s), N), scalarVect(Math.cosh(s), T)); }
+  function X(s)  { return vectSum(scalarVect(Math.cosh(s), N), scalarVect(Math.sinh(s), T)); }
+  function Xp(s) { return vectSum(scalarVect(Math.sinh(s), N), scalarVect(Math.cosh(s), T)); }
   let S1 = pt2Screen(X(s1), hZoom), S2 = pt2Screen(X(s2), hZoom);
   let t1 = geodTangentScreen(X(s1), Xp(s1));
   let t2 = geodTangentScreen(X(s2), Xp(s2));
@@ -974,10 +942,10 @@ function addGeodEdge(ctx, Pv, Qv) {
   if (hZoom < epsilon) {
     let S2 = pt2Screen(Qv, hZoom); ctx.lineTo(S2[0], S2[1]); return;
   }
-  let L = points2Line(Pv, Qv);
-  let N = footOfPerp([1, 0, 0], L);
+  let L = hPoints2Line(Pv, Qv);
+  let N = hFootOfPerp([1, 0, 0], L);
   let c = hDot(N, Pv);
-  let T_raw = vectPlus(Pv, scalarVect(c, N));
+  let T_raw = vectSum(Pv, scalarVect(c, N));
   let d_P = Math.sqrt(Math.max(0, c * c - 1));
   if (d_P < epsilon) {
     let S2 = pt2Screen(Qv, hZoom); ctx.lineTo(S2[0], S2[1]); return;
@@ -1001,7 +969,7 @@ function addGeodPolyPath(ctx, viewVerts) {
 }
 
 function nGonVerts(C, V, n) {
-  let M = rotMat(C, 2 * Math.PI / n);
+  let M = hRotMat(C, 2 * Math.PI / n);
   let verts = [V];
   for (let k = 1; k < n; k++) verts.push(multMatVect(M, verts[k - 1]));
   return verts;
@@ -1074,7 +1042,7 @@ function getSnappedPoint(P, screenPos) {
   if (snapped) return snapped;
   for (let [A, B] of reflEdges) {
     let sA = fromPFD(A), sB = fromPFD(B);
-    let foot = footOfPerp(P, points2Line(sA, sB));
+    let foot = hFootOfPerp(P, hPoints2Line(sA, sB));
     let sc = dispPt(foot);
     let d = Math.hypot(sc[0] - screenPos[0], sc[1] - screenPos[1]);
     if (d < bestDist) { bestDist = d; snapped = foot; }
@@ -1109,8 +1077,8 @@ function alignBaseFD(updateDragState) {
   let V0 = hNorm(multMatVect(candidateMat, originFD[bI]));
   let V1 = hNorm(multMatVect(candidateMat, originFD[bJ]));
   let newMat = alignDet < 0
-    ? isomSeg2SegFlip(originFD[bI], originFD[bJ], V0, V1)
-    : isomSeg2Seg(originFD[bI], originFD[bJ], V0, V1);
+    ? hIsomSeg2SegFlip(originFD[bI], originFD[bJ], V0, V1)
+    : hIsomSeg2Seg(originFD[bI], originFD[bJ], V0, V1);
   moveMat = (typeof newMat === 'string') ? candidateMat : newMat;
   if (isFinite(moveMat[0][0]) && isFinite(moveMat[1][1]) && isFinite(moveMat[2][2]))
     lastGoodMoveMat = moveMat.map(row => [...row]);
@@ -1145,9 +1113,9 @@ function hReDo() {
   rebuildGeom();
 }
 
-// ── drawH — render hyperbolic scene ──────────────────────────────────────────
+// ── hDraw — render hyperbolic scene ──────────────────────────────────────────
 
-function drawH(ctx, c) {
+function hDraw(ctx, c) {
   // Recover from bad moveMat
   if (!moveMat || !isFinite(moveMat[0][0]) || !isFinite(moveMat[1][1]) || !isFinite(moveMat[2][2])) {
     moveMat = lastGoodMoveMat.map(row => [...row]);
@@ -1215,7 +1183,7 @@ function drawH(ctx, c) {
       }
       if (stepEdges[j] === 3 || stepEdges[j] === 8) {
         let t = Math.max(0, Math.min(1, twist));
-        let twistPt = hNorm(vectPlus(scalarVect(1 - t, P), scalarVect(t, Q)));
+        let twistPt = hNorm(vectSum(scalarVect(1 - t, P), scalarVect(t, Q)));
         let s = dispPt(twistPt), r = 6;
         ctx.beginPath();
         ctx.moveTo(s[0], s[1] - r); ctx.lineTo(s[0] + r, s[1]);
@@ -1329,11 +1297,11 @@ function hMousePressed(sx, sy) {
       if (stepEdges[j] !== 3 && stepEdges[j] !== 8) continue;
       let [P, Q, twist] = paramPtList[j];
       let t = Math.max(0, Math.min(1, twist));
-      let twistPt = hNorm(vectPlus(scalarVect(1-t, P), scalarVect(t, Q)));
+      let twistPt = hNorm(vectSum(scalarVect(1-t, P), scalarVect(t, Q)));
       let s = dispPt(twistPt);
       if (Math.abs(posA[0]-s[0]) < editBoxSize && Math.abs(posA[1]-s[1]) < editBoxSize) {
         paramNum = j; paramEnd = -1;
-        paramDragLine = points2Line(P, Q);
+        paramDragLine = hPoints2Line(P, Q);
         return;
       }
     }
@@ -1346,14 +1314,14 @@ function hMousePressed(sx, sy) {
         paramNum = j; paramEnd = 0;
         paramDragFixed = multMatVect(moveMat, Q);
         paramDragFixedScene = Q;
-        paramDragLine = points2Line(P, Q);
+        paramDragLine = hPoints2Line(P, Q);
         return;
       }
       if (Math.abs(posA[0]-sQ[0]) < editBoxSize && Math.abs(posA[1]-sQ[1]) < editBoxSize) {
         paramNum = j; paramEnd = 1;
         paramDragFixed = multMatVect(moveMat, P);
         paramDragFixedScene = P;
-        paramDragLine = points2Line(P, Q);
+        paramDragLine = hPoints2Line(P, Q);
         return;
       }
     }
@@ -1372,7 +1340,7 @@ function hMouseMoved(sx, sy) {
 
   if (mode === 0 && paramNum >= 0) {
     let mouseScene = multMatVect(invMat(moveMatAtPress), posB3d);
-    let F = footOfPerp(mouseScene, paramDragLine);
+    let F = hFootOfPerp(mouseScene, paramDragLine);
     if (paramEnd === -1) {
       let [P, Q] = paramPtList[paramNum];
       let lenPQ = hDist(P, Q);
@@ -1404,8 +1372,8 @@ function hMouseMoved(sx, sy) {
     let Q_new = paramPtList[paramNum][1 - paramEnd];
     let F_view = multMatVect(moveMatAtPress, F);
     moveMat = matDet(moveMatAtPress) >= 0
-      ? isomSeg2Seg(P_new, Q_new, F_view, paramDragFixed, 0)
-      : isomSeg2SegFlip(P_new, Q_new, F_view, paramDragFixed);
+      ? hIsomSeg2Seg(P_new, Q_new, F_view, paramDragFixed, 0)
+      : hIsomSeg2SegFlip(P_new, Q_new, F_view, paramDragFixed);
     return;
   }
 
@@ -1418,13 +1386,13 @@ function hMouseMoved(sx, sy) {
 
   if (posA === 0) return;
   if (mode === -1) {
-    let candidate = multMatMat(transMat(posA3d, posB3d), tempMat);
+    let candidate = multMatMat(hTransMat(posA3d, posB3d), tempMat);
     if (isFinite(candidate[0][0])) {
       let V0 = hNorm(multMatVect(candidate, originFD[panBestI]));
       let V1 = hNorm(multMatVect(candidate, originFD[panBestJ]));
       let newMat = panDet < 0
-        ? isomSeg2SegFlip(originFD[panBestI], originFD[panBestJ], V0, V1)
-        : isomSeg2Seg(originFD[panBestI], originFD[panBestJ], V0, V1);
+        ? hIsomSeg2SegFlip(originFD[panBestI], originFD[panBestJ], V0, V1)
+        : hIsomSeg2Seg(originFD[panBestI], originFD[panBestJ], V0, V1);
       moveMat = (typeof newMat !== 'string') ? newMat : candidate;
       if (isFinite(moveMat[0][0]) && isFinite(moveMat[1][1]) && isFinite(moveMat[2][2]))
         lastGoodMoveMat = moveMat.map(row => [...row]);
