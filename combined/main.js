@@ -79,23 +79,23 @@ function _canonOrbi(cone, kali) {
 function orbi2EGroup(handle, crosscap, cone, kali) {
   var o = _canonOrbi(cone, kali);
   var cs=o.cs, ks=o.ks;
-  if (handle===1 && crosscap===0 && cs==='[]'         && ks==='[]')           return 16; // p1
-  if (handle===0 && crosscap===0 && cs==='[2,2,2,2]'  && ks==='[]')           return 15; // p2
-  if (handle===0 && crosscap===2 && cs==='[]'         && ks==='[]')           return 12; // pg ××
-  if (handle===0 && crosscap===0 && cs==='[]'         && ks==='[[],[]]')      return 11; // pm **
-  if (handle===0 && crosscap===1 && cs==='[]'         && ks==='[[]]')         return 14; // cm *×
-  if (handle===0 && crosscap===0 && cs==='[]'         && ks==='[[2,2,2,2]]')  return 9;  // pmm *2222
-  if (handle===0 && crosscap===0 && cs==='[2,2]'      && ks==='[[]]')         return 10; // pmg 22*
-  if (handle===0 && crosscap===1 && cs==='[2,2]'      && ks==='[]')           return 8;  // pgg 22×
-  if (handle===0 && crosscap===0 && cs==='[2]'        && ks==='[[2,2]]')      return 13; // cmm 2*22
-  if (handle===0 && crosscap===0 && cs==='[4,4,2]'    && ks==='[]')           return 1;  // p4  442
-  if (handle===0 && crosscap===0 && cs==='[]'         && ks==='[[4,4,2]]')    return 0;  // p4m *442
-  if (handle===0 && crosscap===0 && cs==='[4]'        && ks==='[[2]]')        return 2;  // p4g 4*2
+  if (handle===0 && crosscap===0 && cs==='[]'         && ks==='[[6,3,2]]')    return 0;  // p6m *632
+  if (handle===0 && crosscap===0 && cs==='[6,3,2]'    && ks==='[]')           return 1;  // p6  632
+  if (handle===0 && crosscap===0 && cs==='[]'         && ks==='[[4,4,2]]')    return 2;  // p4m *442
+  if (handle===0 && crosscap===0 && cs==='[4,4,2]'    && ks==='[]')           return 3;  // p4  442
+  if (handle===0 && crosscap===0 && cs==='[4]'        && ks==='[[2]]')        return 4;  // p4g 4*2
+  if (handle===0 && crosscap===0 && cs==='[]'         && ks==='[[3,3,3]]')    return 5;  // p3m1 *333
   if (handle===0 && crosscap===0 && cs==='[3,3,3]'    && ks==='[]')           return 6;  // p3  333
-  if (handle===0 && crosscap===0 && cs==='[]'         && ks==='[[3,3,3]]')    return 4;  // p3m1 *333
   if (handle===0 && crosscap===0 && cs==='[3]'        && ks==='[[3]]')        return 7;  // p31m 3*3
-  if (handle===0 && crosscap===0 && cs==='[6,3,2]'    && ks==='[]')           return 5;  // p6  632
-  if (handle===0 && crosscap===0 && cs==='[]'         && ks==='[[6,3,2]]')    return 3;  // p6m *632
+  if (handle===0 && crosscap===0 && cs==='[]'         && ks==='[[2,2,2,2]]')  return 8;  // pmm *2222
+  if (handle===0 && crosscap===0 && cs==='[2]'        && ks==='[[2,2]]')      return 9; // cmm 2*22
+  if (handle===0 && crosscap===0 && cs==='[2,2]'      && ks==='[[]]')         return 10; // pmg 22*
+  if (handle===0 && crosscap===1 && cs==='[2,2]'      && ks==='[]')           return 11;  // pgg 22×
+  if (handle===0 && crosscap===0 && cs==='[2,2,2,2]'  && ks==='[]')           return 12; // p2 2222
+  if (handle===0 && crosscap===0 && cs==='[]'         && ks==='[[],[]]')      return 13; // pm **
+  if (handle===0 && crosscap===1 && cs==='[]'         && ks==='[[]]')         return 14; // cm *×
+  if (handle===0 && crosscap===2 && cs==='[]'         && ks==='[]')           return 15; // pg ××
+  if (handle===1 && crosscap===0 && cs==='[]'         && ks==='[]')           return 16; // p1 o
   return -1;
 }
 

@@ -5,216 +5,180 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // ── E state ───────────────────────────────────────────────────────────────────
-// With R=1, W=H=W2=0.5.  TranA/B are lattice vectors; TranOrig is the FD origin.
+var eOrbi, originFD, eGenMaps, paramPtList, originFDCent;
+var eGenMats;
+var eScale  = 150;   // pixels per unit length
+var eTransX = 0;     // screen X of world origin (set by main.js init/resize)
+var eTransY = 0;     // screen Y of world origin
 
-var eOrbi    = 13;
-var eNumMaps = 8;
-var eTranAx  = 2,   eTranAy = 0;
-var eTranBx  = 0,   eTranBy = 2;
-var eTranOrigx = 1, eTranOrigy = 1;
-var eScale   = 100;   // pixels per unit length
-var eTransX  = 0;     // screen X of native origin (set by init/resize)
-var eTransY  = 0;     // screen Y of native origin
-var ePosA    = null;  // native [x,y] at press
-var ePosB    = null;  // native [x,y] at current cursor
+var eMoveMat      = [[1,0,0],[0,1,0],[0,0,1]]; // similarity: shapeFD → world
+var eShapeFD      = null;   // mutable working shape (copy of originFD)
+var eParamVerts   = [];     // indices of movable param endpoints in eShapeFD
+var eParamDragIdx = -1;     // which handle is being dragged: 0=v1, 1=second, -1=none
+var eShapeNum  = -1;        // edit mode: index of selected stack item (-1 = none)
+var eControlPt =  0;        // edit mode: which endpoint is selected (1 or 2)
+var ePosA = null, ePosB = null;  // line drawing: start/end screen coords [sx,sy]
+var _ePanStart  = null;          // pan drag: start screen pos
+var _ePanOrigin = null;          // pan drag: [eTransX,eTransY] at press
+var eNeighborMats = null;        // BFS tile matrices (canonical space)
 
 // ── E coordinate conversion ───────────────────────────────────────────────────
-
-function ePt2Screen(x, y) {
-  return [eTransX + x * eScale, eTransY - y * eScale];
+// Accepts [x,y] or [x,y,1] — only first two components used.
+function eVect2Screen(v) {
+  return [eTransX + v[0] * eScale, eTransY - v[1] * eScale];
 }
-function eScreen2Pt(sx, sy) {
-  return [(sx - eTransX) / eScale, (eTransY - sy) / eScale];
+function eScreen2Vect(sx, sy) {
+  return [(sx - eTransX) / eScale, (eTransY - sy) / eScale, 1];
 }
 
-// ── E group setup ─────────────────────────────────────────────────────────────
+// ── Inverse of a similarity (orientation-preserving) matrix ──────────────────
+// For M = [[a,-b,tx],[b,a,ty],[0,0,1]]:  s² = a²+b²
+function eInvSimilarity(M) {
+  var a = M[0][0], b = M[1][0], tx = M[0][2], ty = M[1][2];
+  var s2 = a*a + b*b;
+  return [[ a/s2,  b/s2, -(a*tx + b*ty)/s2],
+          [-b/s2,  a/s2,  (b*tx - a*ty)/s2],
+          [0, 0, 1]];
+}
 
+// Return the current working shape (falls back to originFD if not yet set).
+function eGetShapeFD() { return eShapeFD || originFD; }
+
+// ── eSetGroup ─────────────────────────────────────────────────────────────────
 function eSetGroup(idx) {
   eOrbi = idx;
-  var s3h = 0.8660254037844386; // sqrt(3)/2
-  var s3  = 1.7320508075688772; // sqrt(3)
-  switch (idx) {
-    case 0:  // *442  p4m
-      eTranAx=2; eTranAy=0; eTranBx=0; eTranBy=2;
-      eTranOrigx=1; eTranOrigy=1; eNumMaps=8; break;
-    case 1:  // 442   p4
-      eTranAx=2; eTranAy=0; eTranBx=0; eTranBy=2;
-      eTranOrigx=1; eTranOrigy=1; eNumMaps=4; break;
-    case 2:  // 4*2   p4g
-      eTranAx=1; eTranAy=-1; eTranBx=1; eTranBy=1;
-      eTranOrigx=1.5; eTranOrigy=1.5; eNumMaps=8; break;
-    case 3:  // *632  p6m
-      eTranAx=1.5; eTranAy=s3h; eTranBx=0; eTranBy=s3;
-      eTranOrigx=1.5; eTranOrigy=s3h; eNumMaps=12; break;
-    case 4:  // *333  p3m1
-      eTranAx=1.5; eTranAy=s3h; eTranBx=0; eTranBy=s3;
-      eTranOrigx=1; eTranOrigy=0; eNumMaps=6; break;
-    case 5:  // 632   p6
-      eTranAx=1.5; eTranAy=s3h; eTranBx=0; eTranBy=s3;
-      eTranOrigx=1.5; eTranOrigy=s3h; eNumMaps=6; break;
-    case 6:  // 333   p3
-      eTranAx=1.5; eTranAy=s3h; eTranBx=0; eTranBy=s3;
-      eTranOrigx=1; eTranOrigy=0; eNumMaps=3; break;
-    case 7:  // 3*3   p31m
-      eTranAx=1.5; eTranAy=s3h; eTranBx=0; eTranBy=s3;
-      eTranOrigx=1; eTranOrigy=0; eNumMaps=6; break;
-    case 8:  // 22×   pmg   (W=H=0.5)
-      eTranAx=1; eTranAy=0; eTranBx=0; eTranBy=1;
-      eTranOrigx=0.5; eTranOrigy=0.5; eNumMaps=4; break;
-    case 9:  // *2222 pmm
-      eTranAx=1; eTranAy=0; eTranBx=0; eTranBy=1;
-      eTranOrigx=0.5; eTranOrigy=0.5; eNumMaps=4; break;
-    case 10: // 22*   cmm   (TranAx=2W=1)
-      eTranAx=2; eTranAy=0; eTranBx=0; eTranBy=1;
-      eTranOrigx=1; eTranOrigy=0.5; eNumMaps=4; break;
-    case 11: // **    pm
-      eTranAx=1; eTranAy=0; eTranBx=0; eTranBy=1;
-      eTranOrigx=0.5; eTranOrigy=0.5; eNumMaps=2; break;
-    case 12: // ××    pg
-      eTranAx=1; eTranAy=0; eTranBx=0; eTranBy=1;
-      eTranOrigx=0.5; eTranOrigy=0.5; eNumMaps=2; break;
-    case 13: // 2*22  cmm  (unit cell 2×2, FD = right triangle area 1)
-      eTranAx=2; eTranAy=0; eTranBx=0; eTranBy=2;
-      eTranOrigx=1; eTranOrigy=1; eNumMaps=4; break;
-    case 14: // *×    cm    (W=H=0.5)
-      eTranAx=0.5; eTranAy=-1; eTranBx=0.5; eTranBy=1;
-      eTranOrigx=0.5; eTranOrigy=1.5; eNumMaps=2; break;
-    case 15: // 2222  p2    (W=W2=0.5 → TranAx=1, TranBx=0)
-      eTranAx=1; eTranAy=0; eTranBx=0; eTranBy=1;
-      eTranOrigx=0.5; eTranOrigy=0.5; eNumMaps=2; break;
-    case 16: // ○     p1
-      eTranAx=1; eTranAy=0; eTranBx=0; eTranBy=1;
-      eTranOrigx=0.5; eTranOrigy=0.5; eNumMaps=1; break;
+  eBuildOriginFD();
+  eBuildGenMats();
+}
+
+// ── eBuildOriginFD ────────────────────────────────────────────────────────────
+function eBuildOriginFD() {
+  paramPtList = [0];
+  var s3h = 0.86602540378443864676372317075294; // sqrt(3)/2
+  var P, Q;
+  switch (eOrbi) {
+    case 0:  // *632
+      originFD = [[0,0],[.5,0],[.5,s3h]];
+      originFDCent = [1/3, s3h/3];
+      eGenMaps = [[0,0],[1,0],[2,0]];
+      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
+      break;
+    case 1:  // 632
+      originFD = [[0,0],[1,0],[.5,s3h]];
+      originFDCent = [.5, s3h/3];
+      eGenMaps = [[0,1],[2,1],[1,1]];
+      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
+      break;
+    case 2:  // *442
+      originFD = [[0,0],[1,0],[0,1]];
+      originFDCent = [1/3, 1/3];
+      eGenMaps = [[0,0],[1,0],[2,0]];
+      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
+      break;
+    case 3:  // 442
+      originFD = [[0,0],[1,0],[1,1],[0,1]];
+      originFDCent = [.5, .5];
+      eGenMaps = [[3,1],[2,1],[1,1],[0,1]];
+      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
+      break;
+    case 4:  // 4*2
+      originFD = [[0,0],[1,0],[0,1]];
+      originFDCent = [1/3, 1/3];
+      eGenMaps = [[2,1],[1,0],[0,1]];
+      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
+      break;
+    case 5:  // *333
+      originFD = [[0,0],[1,0],[.5,s3h]];
+      originFDCent = [.5, s3h/3];
+      eGenMaps = [[0,0],[1,0],[2,0]];
+      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
+      break;
+    case 6:  // 333
+      originFD = [[0,0],[1,0],[1.5,s3h],[.5,s3h]];
+      originFDCent = [.75, s3h/2];
+      eGenMaps = [[1,1],[0,1],[3,1],[2,1]];
+      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
+      break;
+    case 7:  // 3*3
+      originFD = [[0,0],[.5,-s3h],[.5,s3h]];
+      originFDCent = [1/3, 0];
+      eGenMaps = [[2,1],[1,0],[0,1]];
+      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
+      break;
+    case 8:  // *2222
+      originFD = [[0,0],[1,0],[1,.5],[0,.5]];
+      originFDCent = [.5, .25];
+      eGenMaps = [[0,0],[1,0],[2,0],[3,0]];
+      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
+      Q = originFD[3]; paramPtList.push([P,Q]);
+      break;
+    case 9:  // 2*22
+      originFD = [[0,0],[1,0],[0,.5]];
+      originFDCent = [1/3, 1/6];
+      eGenMaps = [[0,0],[1,1],[2,0]];
+      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
+      Q = originFD[2]; paramPtList.push([P,Q]);
+      break;
+    case 10:  // 22*
+      originFD = [[0,0],[1,0],[1,.5],[0,.5]];
+      originFDCent = [.5, .25];
+      eGenMaps = [[0,1],[1,0],[2,1],[3,0]];
+      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
+      Q = originFD[3]; paramPtList.push([P,Q]);
+      break;
+    case 11:  // 22×
+      originFD = [[0,0],[1,0],[1,.5],[0,.5]];
+      originFDCent = [.5, .25];
+      eGenMaps = [[0,1],[3,0],[2,1],[1,0]];
+      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
+      Q = originFD[3]; paramPtList.push([P,Q]);
+      break;
+    case 12:  // 2222
+      originFD = [[0,0],[1,0],[1.5,1],[.5,1]];
+      originFDCent = [.75, .5];
+      eGenMaps = [[0,1],[3,1],[2,1],[1,1]];
+      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
+      Q = originFD[3]; paramPtList.push([P,Q]);
+      break;
+    case 13:  // **
+      originFD = [[0,0],[1,0],[1,.5],[0,.5]];
+      originFDCent = [.5, .25];
+      eGenMaps = [[0,0],[3,1],[2,0],[1,1]];
+      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
+      Q = originFD[3]; paramPtList.push([P,Q]);
+      break;
+    case 14:  // *×
+      originFD = [[0,0],[1,0],[1,.5],[0,.5]];
+      originFDCent = [.5, .25];
+      eGenMaps = [[0,0],[3,0],[2,0],[1,0]];
+      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
+      Q = originFD[3]; paramPtList.push([P,Q]);
+      break;
+    case 15:  // ××
+      originFD = [[0,0],[1,0],[1,.5],[0,.5]];
+      originFDCent = [.5, .25];
+      eGenMaps = [[2,1],[3,0],[0,1],[1,0]];
+      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
+      Q = originFD[3]; paramPtList.push([P,Q]);
+      break;
+    case 16:  // o
+      originFD = [[0,0],[1,0],[1.5,1],[.5,1]];
+      originFDCent = [.75, .5];
+      eGenMaps = [[2,1],[3,1],[0,1],[1,1]];
+      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
+      Q = originFD[3]; paramPtList.push([P,Q]);
+      break;
   }
-  eDragHandle = null;
+
+  // Initialise mutable interactive state
+  eShapeFD    = originFD.map(function(v) { return v.slice(); });
+  eMoveMat    = [[1,0,0],[0,1,0],[0,0,1]];
+  eParamVerts = (eOrbi >= 8) ? [1, (eOrbi === 9 ? 2 : 3)] : [1];
 }
 
-// ── E Map Data ────────────────────────────────────────────────────────────────
-// Each row: [m00,m01,m10,m11, a,b]
-//   output = [[m00,m01],[m10,m11]] * input  +  a*A + b*B
-// where A=(eTranAx,eTranAy), B=(eTranBx,eTranBy).
+// ── E isometry helpers (3×3 homogeneous, column-vector convention) ─────────────
 
-var _eH = 0.8660254037844386; // sqrt(3)/2
-
-// ── E tiling maps (BFS from genMats, mirroring H buildNeighborMats) ──────────────────
-//
-// eComputeMaps() generates all eNumMaps isometries that tile one unit cell.
-// It uses eGenMats() as generators and expands by BFS, keeping only maps whose
-// transformed FD centroid is distinct modulo the lattice (A, B).
-
-function eComputeMaps() {
-  var gens  = eGenMats();
-  var verts = eFDVerts();
-  var I     = [[1,0,0],[0,1,0],[0,0,1]];
-
-  // Asymmetric interior probe point: prime-weighted vertex average.
-  // Simple centroid fails when it lands on a mirror axis (e.g. *442 centroid
-  // sits on y=x), causing reflections across that axis to look like duplicates.
-  var primes = [2, 3, 5, 7, 11, 13];
-  var cx = 0, cy = 0, tw = 0;
-  for (var i = 0; i < verts.length; i++) {
-    var w = primes[i % primes.length];
-    cx += w*verts[i][0];  cy += w*verts[i][1];  tw += w;
-  }
-  cx /= tw;  cy /= tw;
-
-  var det = eTranAx*eTranBy - eTranAy*eTranBx;  // det(A | B)
-
-  // Return true if world point (px,py) has NOT been seen yet mod lattice
-  function isNew(px, py) {
-    for (var k = 0; k < cents.length; k++) {
-      var dx = px - cents[k][0],  dy = py - cents[k][1];
-      var fi = (dx*eTranBy - dy*eTranBx) / det;   // lattice coord i
-      var fj = (dy*eTranAx - dx*eTranAy) / det;   // lattice coord j
-      if (Math.abs(fi - Math.round(fi)) < 0.001 &&
-          Math.abs(fj - Math.round(fj)) < 0.001) return false;
-    }
-    return true;
-  }
-
-  var mats  = [I];
-  var cents = [[cx, cy]];
-  var qi    = 0;
-
-  while (qi < mats.length) {
-    var M = mats[qi++];
-    for (var g = 0; g < gens.length; g++) {
-      var N  = multMatMat(gens[g], M);
-      var pc = eApplyMat(N, [cx, cy]);
-      if (isNew(pc[0], pc[1])) {
-        mats.push(N);
-        cents.push([pc[0], pc[1]]);
-        if (mats.length === eNumMaps) return mats;
-      }
-    }
-  }
-  return mats;
-}
-
-// Cached maps — recomputed whenever group or lattice changes
-var _eMaps = null, _eMapOrbi = -1,
-    _eMapAx, _eMapAy, _eMapBx, _eMapBy;
-
-function eGetMaps() {
-  if (_eMaps === null || eOrbi !== _eMapOrbi ||
-      eTranAx !== _eMapAx || eTranAy !== _eMapAy ||
-      eTranBx !== _eMapBx || eTranBy !== _eMapBy) {
-    _eMaps    = eComputeMaps();
-    _eMapOrbi = eOrbi;
-    _eMapAx = eTranAx;  _eMapAy = eTranAy;
-    _eMapBx = eTranBx;  _eMapBy = eTranBy;
-  }
-  return _eMaps;
-}
-
-function eMapOne(myMap, orbi, x, y) {
-  return eApplyMat(eGetMaps()[myMap - 1], [x, y]);
-}
-
-// ── E lattice handle drag ─────────────────────────────────────────────────────
-
-var eDragHandle = null; // null | 'A' | 'B'
-
-function eHasHandleB(orbi) {
-  return eConstraint[orbi] === 'rc' || eConstraint[orbi] === 'ob';
-}
-
-function eApplyConstraintA(ax, ay) {
-  var c = eConstraint[eOrbi];
-  var oldBLen = Math.sqrt(eTranBx*eTranBx + eTranBy*eTranBy);
-  var newALen = Math.sqrt(ax*ax + ay*ay);
-  eTranAx = ax; eTranAy = ay;
-  if      (c === 'sq') { eTranBx = -ay;             eTranBy = ax; }
-  else if (c === 'hx') { eTranBx = .5*ax - _eH*ay;  eTranBy = _eH*ax + .5*ay; }
-  else if (c === 'rc') {
-    if (newALen < 1e-6) return;
-    eTranBx = -ay * oldBLen / newALen;
-    eTranBy =  ax * oldBLen / newALen;
-  }
-  else if (c === 'rh') { eTranBx = ax; eTranBy = -ay; }
-  // 'ob': B unchanged
-}
-
-function eApplyConstraintB(bx, by) {
-  if (eConstraint[eOrbi] === 'rc') {
-    var a2 = eTranAx*eTranAx + eTranAy*eTranAy;
-    if (a2 < 1e-12) return;
-    var t = (-bx*eTranAy + by*eTranAx) / a2;
-    eTranBx = -eTranAy * t;
-    eTranBy =  eTranAx * t;
-  } else {
-    eTranBx = bx; eTranBy = by;
-  }
-}
-
-// ── E isometry helpers (3×3 homogeneous matrices) ─────────────────────────────
-
-function eApplyMat(M, p) {
-  return [M[0][0]*p[0] + M[0][1]*p[1] + M[0][2],
-          M[1][0]*p[0] + M[1][1]*p[1] + M[1][2]];
-}
-
-// Orientation-preserving isometry mapping segment P→Q onto R→S
+// Orientation-preserving isometry mapping segment P→Q onto segment R→S
 function eIsomSeg2Seg(P, Q, R, S) {
   var dx = Q[0]-P[0], dy = Q[1]-P[1];
   var ex = S[0]-R[0], ey = S[1]-R[1];
@@ -226,13 +190,13 @@ function eIsomSeg2Seg(P, Q, R, S) {
   return [[cosT,-sinT,tx],[sinT,cosT,ty],[0,0,1]];
 }
 
-// Orientation-reversing isometry (glide-reflection) mapping P→Q onto R→S
+// Orientation-reversing isometry mapping segment P→Q onto segment R→S
 function eIsomSeg2SegFlip(P, Q, R, S) {
   var dx = Q[0]-P[0], dy = Q[1]-P[1];
   var ex = S[0]-R[0], ey = S[1]-R[1];
   var uLen = Math.sqrt(dx*dx+dy*dy), vLen = Math.sqrt(ex*ex+ey*ey);
   var ux = dx/uLen, uy = dy/uLen, vx = ex/vLen, vy = ey/vLen;
-  var m00 = vx*ux - vy*uy,  m01 = vy*ux + vx*uy;
+  var m00 = vx*ux - vy*uy, m01 = vy*ux + vx*uy;
   var tx  = R[0] - m00*P[0] - m01*P[1];
   var ty  = R[1] - m01*P[0] + m00*P[1];
   return [[m00,m01,tx],[m01,-m00,ty],[0,0,1]];
@@ -245,349 +209,368 @@ function eReflLineMat(P, Q) {
   var dx = ddx/len, dy = ddy/len;
   var m00 = 2*dx*dx-1, m01 = 2*dx*dy;
   var cross = P[0]*dy - P[1]*dx;
-  return [[m00,m01, 2*dy*cross],
-          [m01,-m00,-2*dx*cross],
-          [0,  0,   1]];
+  return [[m00, m01,  2*dy*cross],
+          [m01,-m00, -2*dx*cross],
+          [0,   0,    1]];
 }
 
-// Generator matrices: one per FD edge, maps canonical FD to that neighbor
-function eGenMats() {
-  var v = eFDVerts();
-  var v0=v[0], v1=v[1], v2=v[2], v3=v[3];
-  switch (eOrbi) {
-    case 0:  // *442 – all mirrors
-      return [eReflLineMat(v0,v1), eReflLineMat(v1,v2), eReflLineMat(v2,v0)];
-    case 1:  // 442 – 4-fold rotations at corners
-      return [eIsomSeg2Seg(v0,v3,v0,v1), eIsomSeg2Seg(v3,v2,v1,v2),
-              eIsomSeg2Seg(v2,v1,v2,v3), eIsomSeg2Seg(v1,v0,v3,v0)];
-    case 2:  // 4*2
-      return [eIsomSeg2Seg(v0,v2,v0,v1), eReflLineMat(v1,v2),
-              eIsomSeg2Seg(v1,v0,v2,v0)];
-    case 3:  // *632 – all mirrors
-      return [eReflLineMat(v0,v1), eReflLineMat(v1,v2), eReflLineMat(v2,v0)];
-    case 4:  // *333 – all mirrors
-      return [eReflLineMat(v0,v1), eReflLineMat(v1,v2), eReflLineMat(v2,v0)];
-    case 5:  // 632 – same structure as 4*2
-      return [eIsomSeg2Seg(v0,v2,v0,v1), eReflLineMat(v1,v2),
-              eIsomSeg2Seg(v1,v0,v2,v0)];
-    case 6:  // 333 – quadrilateral, 3-fold rotations
-      return [eIsomSeg2Seg(v2,v1,v0,v1), eIsomSeg2Seg(v1,v0,v1,v2),
-              eIsomSeg2Seg(v0,v3,v2,v3), eIsomSeg2Seg(v3,v2,v3,v0)];
-    case 7:  // 3*3 – same structure as 4*2
-      return [eIsomSeg2Seg(v0,v2,v0,v1), eReflLineMat(v1,v2),
-              eIsomSeg2Seg(v1,v0,v2,v0)];
-    case 8:  // 22× – all glide-reflections
-      return [eIsomSeg2SegFlip(v2,v3,v0,v1), eIsomSeg2SegFlip(v3,v0,v1,v2),
-              eIsomSeg2SegFlip(v0,v1,v2,v3), eIsomSeg2SegFlip(v1,v2,v3,v0)];
-    case 9:  // *2222 – all mirrors
-      return [eReflLineMat(v0,v1), eReflLineMat(v1,v2),
-              eReflLineMat(v2,v3), eReflLineMat(v3,v0)];
-    case 10: // 22* – 2 mirrors + 2 half-turns
-      return [eReflLineMat(v0,v1), eIsomSeg2Seg(v2,v1,v1,v2),
-              eReflLineMat(v2,v3), eIsomSeg2Seg(v0,v3,v3,v0)];
-    case 11: // ** – 2 mirrors + 2 translations
-      return [eIsomSeg2Seg(v3,v2,v0,v1), eReflLineMat(v1,v2),
-              eIsomSeg2Seg(v1,v0,v2,v3), eReflLineMat(v3,v0)];
-    case 12: // ×× – 2 glides + 2 translations
-      return [eIsomSeg2SegFlip(v2,v3,v0,v1), eIsomSeg2Seg(v0,v3,v1,v2),
-              eIsomSeg2SegFlip(v0,v1,v2,v3), eIsomSeg2Seg(v2,v1,v3,v0)];
-    case 13: // 2*22 – mirrors on legs (v0v1, v2v0) + half-turn on hypotenuse (v1v2)
-      return [eReflLineMat(v0,v1), eIsomSeg2Seg(v1,v2,v2,v1),
-              eReflLineMat(v2,v0)];
-    case 14: // *× – glide maps leg v2v0 → v0v1, and leg v0v1 → v2v0
-      return [eIsomSeg2Seg(v2,v0,v0,v1), eReflLineMat(v1,v2),
-              eIsomSeg2Seg(v0,v1,v2,v0)];
-    case 15: // 2222 – 4 half-turns at edge midpoints
-      return [eIsomSeg2Seg(v1,v0,v0,v1), eIsomSeg2Seg(v0,v3,v1,v2),
-              eIsomSeg2Seg(v3,v2,v2,v3), eIsomSeg2Seg(v2,v1,v3,v0)];
-    case 16: // ○ – 4 pure translations
-      return [eIsomSeg2Seg(v3,v2,v0,v1), eIsomSeg2Seg(v0,v3,v1,v2),
-              eIsomSeg2Seg(v1,v0,v2,v3), eIsomSeg2Seg(v2,v1,v3,v0)];
-    default: return [];
+// ── eBuildGenMats ─────────────────────────────────────────────────────────────
+function eBuildGenMats() {
+  var fd = eGetShapeFD();
+  var n  = fd.length;
+  eGenMats = [];
+  for (var i = 0; i < n; i++) {
+    var j = eGenMaps[i][0], orient = eGenMaps[i][1];
+    var Pi = fd[i],       Qi = fd[(i + 1) % n];
+    var Pj = fd[j],       Qj = fd[(j + 1) % n];
+    if (orient === 0) {
+      if (j === i) eGenMats.push(eReflLineMat(Pi, Qi));
+      else         eGenMats.push(eIsomSeg2SegFlip(Pi, Qi, Pj, Qj));
+    } else {
+      eGenMats.push(eIsomSeg2Seg(Pi, Qi, Qj, Pj));
+    }
   }
 }
 
-// ── E drawing ─────────────────────────────────────────────────────────────────
+// ── Drawing helpers ───────────────────────────────────────────────────────────
 
-// Draws one shape (line or polygon) with all its symmetry copies + lattice tiles.
-function eDrawShape(ctx, mode, P, Q, color, myFill) {
-  var w = ctx.canvas.width, h = ctx.canvas.height;
-  // approximate range of lattice indices needed
-  var range = Math.ceil(Math.max(w, h) / eScale / Math.min(Math.abs(eTranAx)||1, Math.abs(eTranBy)||1)) + 4;
+// Draw a polygon given world-space vertices (any [x,y,...] arrays).
+function eDrawPoly(ctx, verts, fillStyle, strokeStyle) {
+  var sp = verts.map(function(v) { return eVect2Screen(v); });
+  ctx.beginPath();
+  ctx.moveTo(sp[0][0], sp[0][1]);
+  for (var i = 1; i < sp.length; i++) ctx.lineTo(sp[i][0], sp[i][1]);
+  ctx.closePath();
+  if (fillStyle)   { ctx.fillStyle   = fillStyle;   ctx.fill();   }
+  if (strokeStyle) { ctx.strokeStyle = strokeStyle; ctx.stroke(); }
+}
 
-  for (var map = 1; map <= eNumMaps; map++) {
-    var mp = eMapOne(map, eOrbi, P[0], P[1]);
-    var mq = eMapOne(map, eOrbi, Q[0], Q[1]);
-    for (var ii = -range; ii <= range; ii++) {
-      for (var jj = -range; jj <= range; jj++) {
-        var dx = ii*eTranAx + jj*eTranBx;
-        var dy = ii*eTranAy + jj*eTranBy;
-        var sp = ePt2Screen(mp[0]+dx, mp[1]+dy);
-        var sq = ePt2Screen(mq[0]+dx, mq[1]+dy);
-        // coarse clip: skip if both endpoints far off canvas
-        if (sp[0] < -200 && sq[0] < -200) continue;
-        if (sp[0] > w+200 && sq[0] > w+200) continue;
-        if (sp[1] < -200 && sq[1] < -200) continue;
-        if (sp[1] > h+200 && sq[1] > h+200) continue;
+// ── eBuildNeighborMats ────────────────────────────────────────────────────────
+// BFS outward from identity in canonical space, collecting every tile whose
+// world-space centre falls within the canvas bounds + one maxDist margin.
+// canvasW, canvasH: pixel dimensions of the canvas element.
+function eBuildNeighborMats(canvasW, canvasH) {
+  var ident = [[1,0,0],[0,1,0],[0,0,1]];
+  if (!eGenMats || eGenMats.length === 0) { eNeighborMats = [ident]; return; }
 
-        if (mode === 1) { // line
-          ctx.beginPath();
-          ctx.moveTo(sp[0], sp[1]);
-          ctx.lineTo(sq[0], sq[1]);
-          ctx.strokeStyle = color;
-          ctx.stroke();
-        } else if (mode > 2) { // polygon: P=center, Q=first vertex
-          var angleStep = 2*Math.PI / mode;
-          var pcx = sp[0], pcy = sp[1]; // mapped/translated center
-          var pvx = sq[0]-sp[0], pvy = sq[1]-sp[1]; // first vertex relative to center
-          ctx.beginPath();
-          for (var k = 0; k < mode; k++) {
-            var cx = Math.cos(k*angleStep), sx2 = Math.sin(k*angleStep);
-            var vx = cx*pvx - sx2*pvy + pcx;
-            var vy = cx*pvy + sx2*pvx + pcy;
-            if (k === 0) ctx.moveTo(vx, vy); else ctx.lineTo(vx, vy);
-          }
-          ctx.closePath();
-          if (myFill === 0) {
-            ctx.strokeStyle = color;
-            ctx.stroke();
-          } else {
-            ctx.fillStyle = color;
-            ctx.fill();
-          }
-        }
+  // Use vertex average of current shape as the canonical centre.
+  // This stays correct even after eShapeFD has been modified by the user.
+  var fd = eGetShapeFD();
+  var cent = [0, 0];
+  for (var vi = 0; vi < fd.length; vi++) { cent[0] += fd[vi][0]; cent[1] += fd[vi][1]; }
+  cent[0] /= fd.length; cent[1] /= fd.length;
+
+  // Distances from cent to each immediate-neighbour centre (canonical).
+  var dists = eGenMats.map(function(M) {
+    var nc = multMatVect(M, [cent[0], cent[1], 1]);
+    var dx = nc[0] - cent[0], dy = nc[1] - cent[1];
+    return Math.sqrt(dx*dx + dy*dy);
+  });
+  var minDist    = Math.min.apply(null, dists);
+  var maxDist    = Math.max.apply(null, dists);
+  var sameThresh = minDist * 0.4; // centres closer than this are the same tile
+
+  // Scale factor of eMoveMat (canonical → world stretch).
+  var a = eMoveMat[0][0], b = eMoveMat[1][0];
+  var s = Math.max(Math.sqrt(a*a + b*b), 1e-9);
+
+  // Canvas bounds in world space.
+  // Use 3× maxDist margin so BFS paths that detour diagonally can always
+  // route through in-bounds intermediate tiles to reach canvas-edge tiles.
+  var margin = maxDist * s * 3;
+  var xMin = (-eTransX)          / eScale - margin;
+  var xMax = (canvasW - eTransX) / eScale + margin;
+  var yMin = (eTransY - canvasH) / eScale - margin;
+  var yMax = eTransY             / eScale + margin;
+
+  // BFS
+  var mats  = [ident];
+  var cents = [[cent[0], cent[1], 1]]; // canonical centres of found tiles
+
+  var idx = 0;
+  while (idx < mats.length && mats.length < 4000) {
+    for (var k = 0; k < eGenMats.length; k++) {
+      var newMat  = multMatMat(eGenMats[k], mats[idx]);
+      var newCent = multMatVect(newMat, [cent[0], cent[1], 1]);
+
+      // World-space bounds check.
+      var wc = multMatVect(eMoveMat, newCent);
+      if (wc[0] < xMin || wc[0] > xMax || wc[1] < yMin || wc[1] > yMax) continue;
+
+      // Duplicate check in canonical space.
+      var isNew = true;
+      for (var j = 0; j < cents.length; j++) {
+        var ddx = newCent[0] - cents[j][0], ddy = newCent[1] - cents[j][1];
+        if (ddx*ddx + ddy*ddy < sameThresh*sameThresh) { isNew = false; break; }
+      }
+      if (isNew) { mats.push(newMat); cents.push(newCent); }
+    }
+    idx++;
+  }
+  eNeighborMats = mats;
+}
+
+// ── Shape drawing helper ──────────────────────────────────────────────────────
+// Draw one stack shape using combined world-transform TM.
+// shape = [type, P_canon, Q_canon, color, fill]
+// type 1 = line segment; type >= 3 = regular n-gon (center P, vertex Q).
+function eDrawShapeWithMat(ctx, shape, TM) {
+  var type = shape[0];
+  var Pw = multMatVect(TM, [shape[1][0], shape[1][1], 1]);
+  var Qw = multMatVect(TM, [shape[2][0], shape[2][1], 1]);
+  var Ps = eVect2Screen(Pw), Qs = eVect2Screen(Qw);
+
+  if (type === 1) {
+    // Straight segment
+    ctx.beginPath();
+    ctx.moveTo(Ps[0], Ps[1]);
+    ctx.lineTo(Qs[0], Qs[1]);
+    ctx.stroke();
+  } else {
+    // Regular n-gon: centre Pw, one vertex Qw
+    var n  = type;
+    var cx = Pw[0], cy = Pw[1];
+    var vx = Qw[0]-cx, vy = Qw[1]-cy;
+    var r  = Math.sqrt(vx*vx + vy*vy);
+    var a0 = Math.atan2(vy, vx);
+    var step = 2*Math.PI / n;
+    ctx.beginPath();
+    for (var k = 0; k < n; k++) {
+      var a  = a0 + k*step;
+      var sc = eVect2Screen([cx + r*Math.cos(a), cy + r*Math.sin(a)]);
+      if (k === 0) ctx.moveTo(sc[0], sc[1]); else ctx.lineTo(sc[0], sc[1]);
+    }
+    ctx.closePath();
+    if (shape[4]) { ctx.fillStyle = shape[3]; ctx.fill(); }
+    ctx.stroke();
+  }
+}
+
+// ── eDraw ─────────────────────────────────────────────────────────────────────
+function eDraw(ctx, c) {
+  var fd = eGetShapeFD();
+
+  // White background
+  ctx.fillStyle = 'white';
+  ctx.fillRect(0, 0, c.width, c.height);
+
+  // Build full neighbour list for this frame (identity tile is index 0).
+  eBuildNeighborMats(c.width, c.height);
+  var nm = eNeighborMats;
+
+  // Draw all tile FDs: neighbours first (outline only), origin on top (beige fill).
+  ctx.lineWidth = 1;
+  for (var k = 1; k < nm.length; k++) {
+    var M   = multMatMat(eMoveMat, nm[k]);
+    var nbr = fd.map(function(v) { return multMatVect(M, [v[0],v[1],1]); });
+    eDrawPoly(ctx, nbr, null, '#aac');
+  }
+  ctx.lineWidth = 1.5;
+  var worldFD = fd.map(function(v) { return multMatVect(eMoveMat, [v[0],v[1],1]); });
+  eDrawPoly(ctx, worldFD, 'rgba(255,240,200,0.8)', '#888');
+
+  // ── Stack shapes tiled through all neighbour mats ─────────────────────────
+  for (var s = 0; s < stack.length; s++) {
+    var shape = stack[s];
+    ctx.strokeStyle = shape[3];
+    ctx.lineWidth   = 1.5;
+    for (var t = 0; t < nm.length; t++) {
+      eDrawShapeWithMat(ctx, shape, multMatMat(eMoveMat, nm[t]));
+    }
+  }
+
+  // ── Preview shape being drawn ─────────────────────────────────────────────
+  if (ePosA !== null && ePosB !== null && mode >= 1) {
+    var invM = eInvSimilarity(eMoveMat);
+    var P = multMatVect(invM, eScreen2Vect(ePosA[0], ePosA[1]));
+    var Q = multMatVect(invM, eScreen2Vect(ePosB[0], ePosB[1]));
+    var preview = [mode === 1 ? 1 : mode, P, Q, color, fill];
+    ctx.strokeStyle = color;
+    ctx.lineWidth   = 1.5;
+    for (var t = 0; t < nm.length; t++) {
+      eDrawShapeWithMat(ctx, preview, multMatMat(eMoveMat, nm[t]));
+    }
+  }
+
+  // ── Parameter edit UI (green) — shown in edit mode only ──────────────────
+  if (mode === 0) {
+    var s0 = eVect2Screen(multMatVect(eMoveMat, [0,0,1]));
+
+    eParamVerts.forEach(function(pvIdx) {
+      var vp = fd[pvIdx];
+      var sw = eVect2Screen(multMatVect(eMoveMat, [vp[0],vp[1],1]));
+
+      // Green line from v0 to handle
+      ctx.beginPath();
+      ctx.moveTo(s0[0], s0[1]);
+      ctx.lineTo(sw[0], sw[1]);
+      ctx.strokeStyle = '#0a0';
+      ctx.lineWidth   = 1.5;
+      ctx.stroke();
+
+      // Filled circle marker at movable endpoint
+      ctx.beginPath();
+      ctx.arc(sw[0], sw[1], 5, 0, 2*Math.PI);
+      ctx.fillStyle = '#0a0';
+      ctx.fill();
+    });
+
+    // ── Stack control-point boxes ─────────────────────────────────────────
+    var r = 8;
+    for (var si = 0; si < stack.length; si++) {
+      for (var cp = 1; cp <= 2; cp++) {
+        var p  = stack[si][cp];
+        var sc = eVect2Screen(multMatVect(eMoveMat, [p[0], p[1], 1]));
+        ctx.beginPath();
+        ctx.rect(sc[0]-r, sc[1]-r, r*2, r*2);
+        ctx.fillStyle = (si === eShapeNum && cp === eControlPt) ? 'yellow' : 'white';
+        ctx.fill();
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth   = 1;
+        ctx.stroke();
       }
     }
   }
 }
 
-// Draw the lattice grid (parallelogram cells)
-function eDrawGrid(ctx) {
-  var w = ctx.canvas.width, h = ctx.canvas.height;
-  var range = Math.ceil(Math.max(w, h) / eScale / Math.min(Math.abs(eTranAx)||1, Math.abs(eTranBy)||1)) + 4;
-  ctx.beginPath();
-  ctx.strokeStyle = "#cccccc";
-  ctx.lineWidth = 1;
-  for (var ii = -range; ii <= range+1; ii++) {
-    for (var jj = -range; jj <= range; jj++) {
-      // A-direction lines
-      var p0 = ePt2Screen(ii*eTranAx + jj*eTranBx, ii*eTranAy + jj*eTranBy);
-      var p1 = ePt2Screen((ii+1)*eTranAx + jj*eTranBx, (ii+1)*eTranAy + jj*eTranBy);
-      ctx.moveTo(p0[0], p0[1]);
-      ctx.lineTo(p1[0], p1[1]);
-    }
-    for (var jj = -range; jj <= range; jj++) {
-      // B-direction lines
-      var p0 = ePt2Screen(ii*eTranAx + jj*eTranBx, ii*eTranAy + jj*eTranBy);
-      var p1 = ePt2Screen(ii*eTranAx + (jj+1)*eTranBx, ii*eTranAy + (jj+1)*eTranBy);
-      ctx.moveTo(p0[0], p0[1]);
-      ctx.lineTo(p1[0], p1[1]);
-    }
-  }
-  ctx.stroke();
+// ── Mouse handlers ────────────────────────────────────────────────────────────
+
+var _eHitR2 = 12 * 12; // hit-test radius² in pixels
+
+// Squared pixel distance from screen point (sx,sy) to world point wv.
+function _eDistSq(sx, sy, wv) {
+  var sv = eVect2Screen(wv);
+  var dx = sx - sv[0], dy = sy - sv[1];
+  return dx*dx + dy*dy;
 }
-
-// ── E Fundamental Domain ──────────────────────────────────────────────────────
-
-// Lattice constraint type per group (controls how dragging A or B handle is constrained).
-var eConstraint = ['sq','sq','sq','hx','hx','hx','hx','hx',
-                   'rc','rc','rc','rc','rc','sq','rh','ob','ob'];
-
-// Lattice-fraction coordinates for each FD vertex.
-// Vertex world position = f[0]*A + f[1]*B  where A=(eTranAx,eTranAy), B=(eTranBx,eTranBy).
-var eFDFracs = [
-  [[0,0],[.5,0],[.5,.5]],                        // 0  *442
-  [[0,0],[.5,0],[.5,.5],[0,.5]],                 // 1  442
-  [[0,0],[.5,0],[0,.5]],                         // 2  4*2
-  [[0,0],[.5,0],[2/3,-1/3]],                     // 3  *632
-  [[0,0],[2/3,-1/3],[1/3,1/3]],                  // 4  *333
-  [[0,0],[2/3,-1/3],[1/3,1/3]],                  // 5  632
-  [[0,0],[2/3,-1/3],[1,0],[1/3,1/3]],            // 6  333
-  [[0,0],[-1/3,2/3],[-1/3,-1/3]],               // 7  3*3
-  [[0,0],[.5,0],[.5,.5],[0,.5]],                 // 8  22×
-  [[0,0],[.5,0],[.5,.5],[0,.5]],                 // 9  *2222
-  [[-.25,0],[.25,0],[.25,.5],[-.25,.5]],         // 10 22*
-  [[0,0],[.5,0],[.5,1],[0,1]],                   // 11 **
-  [[0,0],[1,0],[1,.5],[0,.5]],                   // 12 ××
-  [[0,0],[1,0],[0,.5]],                          // 13 2*22  (v2 = B/2)
-  [[0,0],[1,0],[0,1]],                           // 14 *×
-  [[0,0],[1,0],[1,.5],[0,.5]],                   // 15 2222
-  [[0,0],[1,0],[1,1],[0,1]]                      // 16 ○
-];
-
-function eFDVerts() {
-  var fracs = eFDFracs[eOrbi] || eFDFracs[16];
-  return fracs.map(function(f) {
-    return [f[0]*eTranAx + f[1]*eTranBx, f[0]*eTranAy + f[1]*eTranBy];
-  });
-}
-
-function eDrawFD(ctx) {
-  var verts0 = eFDVerts();
-  var mats = eGenMats();
-
-  function drawPoly(pts, isCanon) {
-    var sp = pts.map(function(p) { return ePt2Screen(p[0], p[1]); });
-    ctx.beginPath();
-    ctx.moveTo(sp[0][0], sp[0][1]);
-    for (var k = 1; k < sp.length; k++) ctx.lineTo(sp[k][0], sp[k][1]);
-    ctx.closePath();
-    if (isCanon) {
-      ctx.fillStyle = 'rgba(255,240,200,0.8)';
-      ctx.fill();
-      ctx.strokeStyle = '#aaa';
-      ctx.stroke();
-    } else {
-      ctx.strokeStyle = '#ccc';
-      ctx.stroke();
-    }
-  }
-
-  ctx.lineWidth = 0.5;
-  drawPoly(verts0, true);
-  for (var k = 0; k < mats.length; k++) {
-    var M = mats[k];
-    drawPoly(verts0.map(function(p) { return eApplyMat(M, p); }), false);
-  }
-}
-
-// ── eDraw(ctx, c) ─────────────────────────────────────────────────────────────
-// Renders the complete E scene.  stack[] items: [mode, P, Q, color, fill]
-// where P,Q are [x,y] native E coordinates.
-
-function eDraw(ctx, c) {
-  if (gridMode) {
-    eDrawFD(ctx);
-    var _ha = ePt2Screen(eTranAx, eTranAy);
-    ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(_ha[0], _ha[1], 7, 0, 2*Math.PI);
-    ctx.fillStyle = '#ffdc64'; ctx.fill();
-    ctx.strokeStyle = '#888'; ctx.stroke();
-    if (eHasHandleB(eOrbi)) {
-      var _hb = ePt2Screen(eTranBx, eTranBy);
-      ctx.beginPath(); ctx.arc(_hb[0], _hb[1], 7, 0, 2*Math.PI);
-      ctx.fillStyle = '#aaddff'; ctx.fill();
-      ctx.strokeStyle = '#888'; ctx.stroke();
-    }
-  }
-
-  ctx.lineWidth = 1;
-  stack.forEach(function(sh) {
-    eDrawShape(ctx, sh[0], sh[1], sh[2], sh[3], sh[4]);
-  });
-
-  // preview current shape
-  if (ePosA !== null && ePosB !== null) {
-    eDrawShape(ctx, mode, ePosA, ePosB, color, fill);
-  }
-
-  // edit mode: show control points
-  if (mode === 0) {
-    var boxSize = 7;
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = "red";
-    stack.forEach(function(sh) {
-      var sp = ePt2Screen(sh[1][0], sh[1][1]);
-      var sq = ePt2Screen(sh[2][0], sh[2][1]);
-      ctx.beginPath();
-      ctx.rect(sp[0]-boxSize, sp[1]-boxSize, 2*boxSize+1, 2*boxSize+1);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.rect(sq[0]-boxSize, sq[1]-boxSize, 2*boxSize+1, 2*boxSize+1);
-      ctx.stroke();
-    });
-  }
-}
-
-// ── E mouse handlers ───────────────────────────────────────────────────────────
-
-var ePanStartScreen = null;
-var ePanStartTransX = 0, ePanStartTransY = 0;
-var eEditShapeIdx = -1, eEditPtIdx = -1;
 
 function eMousePressed(sx, sy) {
-  if (gridMode) {
-    var _ha = ePt2Screen(eTranAx, eTranAy);
-    if (Math.abs(sx-_ha[0]) < 12 && Math.abs(sy-_ha[1]) < 12) { eDragHandle = 'A'; return; }
-    if (eHasHandleB(eOrbi)) {
-      var _hb = ePt2Screen(eTranBx, eTranBy);
-      if (Math.abs(sx-_hb[0]) < 12 && Math.abs(sy-_hb[1]) < 12) { eDragHandle = 'B'; return; }
-    }
-  }
+  var fd = eGetShapeFD();
+
   if (mode === -1) {
-    ePanStartScreen = [sx, sy];
-    ePanStartTransX = eTransX;
-    ePanStartTransY = eTransY;
+    // Pan: record start
+    _ePanStart  = [sx, sy];
+    _ePanOrigin = [eTransX, eTransY];
     return;
   }
-  var pt = eScreen2Pt(sx, sy);
-  if (mode === 0) {
-    eEditShapeIdx = -1; eEditPtIdx = -1;
-    for (var i = 0; i < stack.length; i++) {
-      var sp = ePt2Screen(stack[i][1][0], stack[i][1][1]);
-      var sq = ePt2Screen(stack[i][2][0], stack[i][2][1]);
-      if (Math.abs(sx-sp[0]) < boxSize && Math.abs(sy-sp[1]) < boxSize) { eEditShapeIdx = i; eEditPtIdx = 1; break; }
-      if (Math.abs(sx-sq[0]) < boxSize && Math.abs(sy-sq[1]) < boxSize) { eEditShapeIdx = i; eEditPtIdx = 2; break; }
+
+  // Hit-test param handles (works in all non-pan modes)
+  eParamDragIdx = -1;
+  for (var i = 0; i < eParamVerts.length; i++) {
+    var wv = multMatVect(eMoveMat, [fd[eParamVerts[i]][0], fd[eParamVerts[i]][1], 1]);
+    if (_eDistSq(sx, sy, wv) < _eHitR2) {
+      eParamDragIdx = i;
+      break;
     }
-    return;
   }
-  if (snapMode) pt = eSnapTo(pt);
-  ePosA = pt; ePosB = pt;
-  draw();
+  if (eParamDragIdx >= 0) return;
+
+  if (mode === 0) {
+    // Hit-test stack control-point boxes
+    eShapeNum = -1; eControlPt = 0;
+    var r = 8;
+    var found = false;
+    for (var i = 0; i < stack.length && !found; i++) {
+      for (var cp = 1; cp <= 2; cp++) {
+        var p  = stack[i][cp];
+        var sc = eVect2Screen(multMatVect(eMoveMat, [p[0], p[1], 1]));
+        if (Math.abs(sx - sc[0]) < r && Math.abs(sy - sc[1]) < r) {
+          eShapeNum = i; eControlPt = cp; found = true; break;
+        }
+      }
+    }
+    return; // edit mode never starts a new shape
+  }
+
+  // mode >= 1: start line/polygon drawing
+  ePosA = [sx, sy];
+  ePosB = null;
 }
 
 function eMouseMoved(sx, sy) {
-  if (eDragHandle) {
-    var pt = eScreen2Pt(sx, sy);
-    if (eDragHandle === 'A') eApplyConstraintA(pt[0], pt[1]);
-    else                     eApplyConstraintB(pt[0], pt[1]);
-    draw(); return;
-  }
-  if (mode === -1 && ePanStartScreen) {
-    eTransX = ePanStartTransX + (sx - ePanStartScreen[0]);
-    eTransY = ePanStartTransY + (sy - ePanStartScreen[1]);
+  // ── Pan ──────────────────────────────────────────────────────────────────
+  if (mode === -1 && _ePanStart !== null) {
+    eTransX = _ePanOrigin[0] + (sx - _ePanStart[0]);
+    eTransY = _ePanOrigin[1] + (sy - _ePanStart[1]);
     draw();
     return;
   }
-  if (mode === 0 && eEditShapeIdx >= 0) {
-    var pt = eScreen2Pt(sx, sy);
-    if (snapMode) pt = eSnapTo(pt);
-    stack[eEditShapeIdx][eEditPtIdx] = pt;
+
+  // ── Edit-mode control-point drag ─────────────────────────────────────────
+  if (mode === 0 && eShapeNum >= 0) {
+    var invM = eInvSimilarity(eMoveMat);
+    var pC   = multMatVect(invM, eScreen2Vect(sx, sy));
+    stack[eShapeNum][eControlPt] = [pC[0], pC[1]];
     draw();
     return;
   }
-  if (ePosA !== null) {
-    ePosB = eScreen2Pt(sx, sy);
-    if (snapMode) ePosB = eSnapTo(ePosB);
+
+  // ── Param drag ────────────────────────────────────────────────────────────
+  if (eParamDragIdx !== -1) {
+    var fd = eGetShapeFD();
+    var p  = eScreen2Vect(sx, sy);
+
+    if (eParamDragIdx === 0) {
+      // Drag v1: update eMoveMat (scale + rotation), keeping v0 world-fixed
+      var anchor = [eMoveMat[0][2], eMoveMat[1][2]];
+      var v1     = fd[1];
+      eMoveMat = eIsomSeg2Seg([0,0], [v1[0],v1[1]], anchor, [p[0],p[1]]);
+    } else {
+      // Drag second param: update eShapeFD shape
+      var pC    = multMatVect(eInvSimilarity(eMoveMat), [p[0],p[1],1]);
+      var pvIdx = eParamVerts[1];
+      var v1    = fd[1];
+      var newPos;
+
+      // Right-angle constraint: groups 8–11, 13–15
+      var rightAngle = (eOrbi >= 8 && eOrbi <= 11) ||
+                       (eOrbi >= 13 && eOrbi <= 15);
+      if (rightAngle) {
+        var len2 = v1[0]*v1[0] + v1[1]*v1[1];
+        var t    = (-v1[1]*pC[0] + v1[0]*pC[1]) / len2;
+        newPos   = [-t*v1[1], t*v1[0]];
+      } else {
+        newPos = [pC[0], pC[1]];
+      }
+
+      eShapeFD[pvIdx] = newPos;
+      if (fd.length === 4 && pvIdx === 3) {
+        eShapeFD[2] = [eShapeFD[1][0] + newPos[0], eShapeFD[1][1] + newPos[1]];
+      }
+      eBuildGenMats();
+    }
+    draw();
+    return;
+  }
+
+  // ── Line/polygon preview ──────────────────────────────────────────────────
+  if (ePosA !== null && mode >= 1) {
+    ePosB = [sx, sy];
     draw();
   }
 }
 
 function eMouseReleased(sx, sy) {
-  if (eDragHandle) { eDragHandle = null; return; }
-  if (mode === -1) { ePanStartScreen = null; return; }
-  if (mode === 0)  { eEditShapeIdx = -1; draw(); return; }
-  if (ePosA !== null) {
-    ePosB = eScreen2Pt(sx, sy);
-    if (snapMode) ePosB = eSnapTo(ePosB);
+  // End pan
+  _ePanStart = null;
+
+  // End param drag / control-point drag
+  eParamDragIdx = -1;
+  eShapeNum = -1;
+
+  // Commit line/polygon to stack
+  if (ePosA !== null && ePosB !== null && mode >= 1) {
+    var invM = eInvSimilarity(eMoveMat);
+    var P    = multMatVect(invM, eScreen2Vect(ePosA[0], ePosA[1]));
+    var Q    = multMatVect(invM, eScreen2Vect(ePosB[0], ePosB[1]));
+    stack.push([mode === 1 ? 1 : mode,
+                [P[0], P[1]], [Q[0], Q[1]],
+                color,
+                mode === 1 ? 0 : fill]);
     undoStack = [];
-    stack.push([mode, ePosA, ePosB, color, fill]);
-    ePosA = null; ePosB = null;
     draw();
   }
-}
 
-// Simple E snap: snap to nearest lattice vertex
-function eSnapTo(pt) {
-  var det = eTranAx*eTranBy - eTranAy*eTranBx;
-  if (Math.abs(det) < 1e-10) return pt;
-  var fi = ( (pt[0]-eTranOrigx)*eTranBy - (pt[1]-eTranOrigy)*eTranBx) / det;
-  var fj = (-(pt[0]-eTranOrigx)*eTranAy + (pt[1]-eTranOrigy)*eTranAx) / det;
-  var ni = Math.round(fi), nj = Math.round(fj);
-  var near = [eTranOrigx + ni*eTranAx + nj*eTranBx,
-              eTranOrigy + ni*eTranAy + nj*eTranBy];
-  var snapPx = boxSize * 2 / eScale;
-  var dx = pt[0]-near[0], dy = pt[1]-near[1];
-  if (dx*dx+dy*dy < snapPx*snapPx) return near;
-  return pt;
+  ePosA = null;
+  ePosB = null;
 }

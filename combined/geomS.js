@@ -637,6 +637,23 @@ function sDraw(ctx, c) {
       ctx.restore();
     }
   });
+
+  // Edit-mode control point markers (drawn on top of everything)
+  if (mode === 0) {
+    var r = boxSize;
+    for (var si = 0; si < stack.length; si++) {
+      for (var cp = 1; cp <= 2; cp++) {
+        var sc = sVect2screen(stack[si][cp]);
+        ctx.beginPath();
+        ctx.rect(sc[0]-r, sc[1]-r, r*2, r*2);
+        ctx.fillStyle = (si === sEditShapeIdx && cp === sEditPtIdx) ? 'yellow' : 'white';
+        ctx.fill();
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth   = 1;
+        ctx.stroke();
+      }
+    }
+  }
 }
 
 // ── S mouse handlers ───────────────────────────────────────────────────────────
