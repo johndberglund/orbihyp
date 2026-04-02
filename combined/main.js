@@ -234,8 +234,9 @@ function reDo() {
     geom = 'H'; hReDo();
   }
 
-  // Show zoom only for H
-  document.getElementById("hZoomDiv").style.display = (geom === 'H') ? "" : "none";
+  // Show zoom only for H; show opaque toggle only for S
+  document.getElementById("hZoomDiv").style.display   = (geom === 'H') ? "" : "none";
+  document.getElementById("sOpaqueDiv").style.display = (geom === 'S') ? "" : "none";
 
   draw();
 }
@@ -339,6 +340,11 @@ function setGrid() {
 
 function setSnap() {
   snapMode = document.getElementById("snap").checked;
+}
+
+function setOpaque() {
+  sOpaque = document.getElementById("opaque").checked;
+  draw();
 }
 
 function goPng(el) {

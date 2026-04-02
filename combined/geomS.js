@@ -12,6 +12,7 @@ var sSymVects  = [[0,1,0],[1,0,0],[0,1.6180339887498948482045868343656,1]];
 var sNumMaps   = 24;
 // scrRadius, scrCenterX, scrCenterY are shared with geomH.js (defined there).
 var sPosA3d = [], sPosB3d = [];
+var sOpaque = false;
 var sBackupStack = [], sBackupSymVects = [];
 
 // ── S vector math ─────────────────────────────────────────────────────────────
@@ -591,8 +592,8 @@ function sDraw(ctx, c) {
     sFindBez(frontBez, rearBez, mode, sPosA3d, sPosB3d, color, fill);
   }
 
-  // draw rear hemisphere
-  rearBez.forEach(function(bez) {
+  // draw rear hemisphere (skipped in opaque mode)
+  if (!sOpaque) rearBez.forEach(function(bez) {
     ctx.beginPath();
     ctx.moveTo(bez[0], bez[1]);
     bez[2].forEach(function(seg) {

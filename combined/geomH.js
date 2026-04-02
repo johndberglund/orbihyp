@@ -317,7 +317,7 @@ function getPillow(thisType, thisParamList) {
     myMat = hIsomSeg2Seg(shape2[0], shape2[2], shape1[0], shape1[1]);
     newShape2 = shape2.map(v => multMatVect(myMat, v));
     myShape = [newShape2[0], newShape2[1], newShape2[2], shape1[2]];
-    mid1 = hhMidPoint(myShape[3], myShape[0]);
+    mid1 = hMidPoint(myShape[3], myShape[0]);
     myMat = hIsomSeg2Seg(myShape[2], myShape[3], myShape[2], myShape[1]);
     vert1 = multMatVect(myMat, mid1);
     myShape = [myShape[0], myShape[1], vert1, myShape[2], mid1];
@@ -1344,6 +1344,8 @@ function hMouseMoved(sx, sy) {
     if (paramEnd === -1) {
       let [P, Q] = paramPtList[paramNum];
       let lenPQ = hDist(P, Q);
+      let sP = dispPt(P), sQ = dispPt(Q), sF = dispPt(hNorm(mouseScene));
+      console.log(`mouse(${posB[0]},${posB[1]}) P_scr(${sP[0].toFixed(0)},${sP[1].toFixed(0)}) Q_scr(${sQ[0].toFixed(0)},${sQ[1].toFixed(0)}) F_scr(${sF[0].toFixed(0)},${sF[1].toFixed(0)})`);
       if (lenPQ > epsilon) {
         let distPF = hDist(P, F), distFQ = hDist(F, Q);
         let t;
@@ -1351,6 +1353,7 @@ function hMouseMoved(sx, sy) {
         else if (distFQ > lenPQ) { t = 0; }
         else { t = 1; }
         if (t < epsilon) t = 0;
+        console.log(`  distPF=${distPF.toFixed(4)} distFQ=${distFQ.toFixed(4)} lenPQ=${lenPQ.toFixed(4)} t=${t.toFixed(4)}`);
         params[paramNum][1] = t;
         paramPtList[paramNum][2] = t;
       }
@@ -1358,7 +1361,12 @@ function hMouseMoved(sx, sy) {
       if (stepEdges[paramNum] === 3) {
         buildAllGenMats(); buildAllMappedCents(); buildIndexedCents();
         buildGenMats(); buildNeighborMats();
-      } else { rebuildGeom(); }
+      } else {
+        rebuildGeom();
+        if (paramPtList[paramNum]) {
+          paramDragLine = hPoints2Line(paramPtList[paramNum][0], paramPtList[paramNum][1]);
+        }
+      }
       baseFDIdx = savedIdx;
       return;
     }
