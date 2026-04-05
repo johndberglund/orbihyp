@@ -26,7 +26,8 @@ var baseFDIdx  = 0;
 var panBestI = 0, panBestJ = 1, panDet = 1;
 var moveMatAtPress;
 var paramNum = -1, paramEnd = -1;
-var paramDragFixed, paramDragLine, paramDragFixedScene;
+var paramDragFixed, paramDragLine, paramDragFixedScene, paramDragFlip;
+var paramDragLineView, paramDragAnchorView, paramDragTangentView, paramDragLenPQ, paramDragT0;
 
 // ── H structural state ────────────────────────────────────────────────────────
 
@@ -166,8 +167,9 @@ function hIsomSeg2Seg(P, Q, R, S, twist=0) {
     let d = hDist(R, S);
     let V = scalarVect(1/Math.sinh(d), vectDiff(S, scalarVect(Math.cosh(d), R)));
     let td = twist * d;
-    R = vectSum(scalarVect(Math.cosh(td), R),     scalarVect(Math.sinh(td), V));
-    S = vectSum(scalarVect(Math.cosh(td + d), R), scalarVect(Math.sinh(td + d), V));
+    let R0 = R;
+    R = vectSum(scalarVect(Math.cosh(td),     R0), scalarVect(Math.sinh(td),     V));
+    S = vectSum(scalarVect(Math.cosh(td + d), R0), scalarVect(Math.sinh(td + d), V));
   }
   let reflMat1, reflMat2;
   if (hDist(P, R) < epsilon) {
@@ -775,7 +777,7 @@ function buildNeighborMats() {
   neighborCents = [originFDCent];
   neighborMaps  = [];
   let matIndex = 0;
-  while (matIndex < neighborMats.length) {
+  while (matIndex < neighborMats.length && neighborMats.length < 5000) {
     let parentSeq = matIndex === 0 ? [] : neighborMaps[matIndex - 1];
     for (let k = 0; k < genMats.length; k++) {
       let newMat  = multMatMat(genMats[k], neighborMats[matIndex]);
@@ -1301,7 +1303,21 @@ function hMousePressed(sx, sy) {
       let s = dispPt(twistPt);
       if (Math.abs(posA[0]-s[0]) < editBoxSize && Math.abs(posA[1]-s[1]) < editBoxSize) {
         paramNum = j; paramEnd = -1;
-        paramDragLine = hPoints2Line(P, Q);
+        let d = hDist(P, Q);
+        let t0 = Math.max(0, Math.min(1, twist));
+        // Tangent at the current dot position toward Q.
+        // hDot(F, V_dot) = sinh(signed arc-length from dot to F), so
+        // delta_s = arcsinh(hDot(F_view, V_dot_view)) gives movement from press position.
+        let dot = hNorm(vectSum(scalarVect(1-t0, P), scalarVect(t0, Q)));
+        let dq = hDist(dot, Q);
+        let V_dot = dq > epsilon
+          ? scalarVect(1/Math.sinh(dq), vectDiff(Q, scalarVect(Math.cosh(dq), dot)))
+          : scalarVect(1/Math.sinh(d),  vectDiff(scalarVect(Math.cosh(d), Q), P));
+        // Store in view space — immune to rebuildGeom recentering
+        paramDragLineView    = multMatVect(moveMat, hPoints2Line(P, Q));
+        paramDragTangentView = multMatVect(moveMat, V_dot);
+        paramDragLenPQ = d;
+        paramDragT0 = t0;
         return;
       }
     }
@@ -1315,6 +1331,7 @@ function hMousePressed(sx, sy) {
         paramDragFixed = multMatVect(moveMat, Q);
         paramDragFixedScene = Q;
         paramDragLine = hPoints2Line(P, Q);
+        paramDragFlip = matDet(moveMat) < 0;
         return;
       }
       if (Math.abs(posA[0]-sQ[0]) < editBoxSize && Math.abs(posA[1]-sQ[1]) < editBoxSize) {
@@ -1322,6 +1339,7 @@ function hMousePressed(sx, sy) {
         paramDragFixed = multMatVect(moveMat, P);
         paramDragFixedScene = P;
         paramDragLine = hPoints2Line(P, Q);
+        paramDragFlip = matDet(moveMat) < 0;
         return;
       }
     }
@@ -1339,49 +1357,59 @@ function hMouseMoved(sx, sy) {
   posB3d = screen2Pt(posB, hZoom);
 
   if (mode === 0 && paramNum >= 0) {
-    let mouseScene = multMatVect(invMat(moveMatAtPress), posB3d);
-    let F = hFootOfPerp(mouseScene, paramDragLine);
     if (paramEnd === -1) {
-      let [P, Q] = paramPtList[paramNum];
-      let lenPQ = hDist(P, Q);
-      let sP = dispPt(P), sQ = dispPt(Q), sF = dispPt(hNorm(mouseScene));
-      console.log(`mouse(${posB[0]},${posB[1]}) P_scr(${sP[0].toFixed(0)},${sP[1].toFixed(0)}) Q_scr(${sQ[0].toFixed(0)},${sQ[1].toFixed(0)}) F_scr(${sF[0].toFixed(0)},${sF[1].toFixed(0)})`);
-      if (lenPQ > epsilon) {
-        let distPF = hDist(P, F), distFQ = hDist(F, Q);
-        let t;
-        if (distPF + distFQ < lenPQ + 0.001) { t = distPF / lenPQ; }
-        else if (distFQ > lenPQ) { t = 0; }
-        else { t = 1; }
-        if (t < epsilon) t = 0;
-        console.log(`  distPF=${distPF.toFixed(4)} distFQ=${distFQ.toFixed(4)} lenPQ=${lenPQ.toFixed(4)} t=${t.toFixed(4)}`);
-        params[paramNum][1] = t;
-        paramPtList[paramNum][2] = t;
-      }
-      let savedIdx = baseFDIdx;
+      // Twist drag: work entirely in view space so rebuildGeom recentering can't disturb us.
+      let F_view = hFootOfPerp(posB3d, paramDragLineView);
+      let delta_s = Math.asinh(hDot(F_view, paramDragTangentView));
+      let t = paramDragT0 + delta_s / paramDragLenPQ;
+      t = Math.max(0, Math.min(1, t));
+      if (t < epsilon) t = 0;
+      params[paramNum][1] = t;
+      paramPtList[paramNum][2] = t;
       if (stepEdges[paramNum] === 3) {
         buildAllGenMats(); buildAllMappedCents(); buildIndexedCents();
         buildGenMats(); buildNeighborMats();
-      } else {
-        rebuildGeom();
-        if (paramPtList[paramNum]) {
-          paramDragLine = hPoints2Line(paramPtList[paramNum][0], paramPtList[paramNum][1]);
-        }
+        updateBaseFD();
       }
-      baseFDIdx = savedIdx;
+      // stepEdge 8: don't rebuild during drag — just show dot position, rebuild on release
       return;
     }
+    let mouseScene = multMatVect(invMat(moveMatAtPress), posB3d);
+    let F = hFootOfPerp(mouseScene, paramDragLine);
     let fixedPtScene = paramDragFixedScene;
     if (hDist(F, fixedPtScene) < epsilon * 100) return;
     params[paramNum][0] = hDist(F, fixedPtScene);
-    let savedIdx = baseFDIdx;
     rebuildGeom();
-    baseFDIdx = savedIdx;
     let P_new = paramPtList[paramNum][paramEnd];
     let Q_new = paramPtList[paramNum][1 - paramEnd];
-    let F_view = multMatVect(moveMatAtPress, F);
-    moveMat = matDet(moveMatAtPress) >= 0
+    // Use the *actual* rebuilt distance so hIsomSeg2Seg's distance check always
+    // passes, even when params[0] ≠ hDist(P_new,Q_new) (e.g. P6 crosscap verts).
+    let d_actual   = hDist(P_new, Q_new);
+    let F_view_raw = multMatVect(moveMatAtPress, F);
+    let d_raw      = hDist(paramDragFixed, F_view_raw);
+    let F_view;
+    if (d_raw > epsilon && d_actual > epsilon) {
+      // Rescale along the same geodesic direction to match d_actual.
+      // This keeps the isometry aligned with the original P→Q geodesic in view
+      // so the correct edge tracks the mouse (not a rotated/different one).
+      let V = scalarVect(1/Math.sinh(d_raw), vectDiff(F_view_raw, scalarVect(Math.cosh(d_raw), paramDragFixed)));
+      F_view = vectSum(scalarVect(Math.cosh(d_actual), paramDragFixed), scalarVect(Math.sinh(d_actual), V));
+    } else {
+      F_view = F_view_raw;  // degenerate fallback
+    }
+    let newMat = !paramDragFlip
       ? hIsomSeg2Seg(P_new, Q_new, F_view, paramDragFixed, 0)
       : hIsomSeg2SegFlip(P_new, Q_new, F_view, paramDragFixed);
+    if (typeof newMat !== 'string') {
+      moveMat = newMat;
+    } else {
+      // rebuildGeom() shifted the scene by recenterMat; compensate so the
+      // stale moveMat still points to the right place.
+      moveMat = multMatMat(moveMat, invMat(recenterMat));
+      if (isFinite(moveMat[0][0]) && isFinite(moveMat[1][1]) && isFinite(moveMat[2][2]))
+        lastGoodMoveMat = moveMat.map(row => [...row]);
+    }
+    updateBaseFD();
     return;
   }
 
@@ -1409,7 +1437,17 @@ function hMouseMoved(sx, sy) {
 }
 
 function hMouseReleased(sx, sy) {
-  if (mode === 0) { shapeNum = -1; paramNum = -1; posA = 0; alignBaseFD(false); return; }
+  if (mode === 0) {
+    if (paramNum >= 0 && paramEnd === -1 && stepEdges[paramNum] === 8) {
+      rebuildGeom();
+      // recenterMat shifted the scene; compensate moveMat so the view doesn't jump
+      moveMat = multMatMat(moveMat, invMat(recenterMat));
+      if (isFinite(moveMat[0][0]) && isFinite(moveMat[1][1]) && isFinite(moveMat[2][2]))
+        lastGoodMoveMat = moveMat.map(row => [...row]);
+      updateBaseFD();
+    }
+    shapeNum = -1; paramNum = -1; posA = 0; alignBaseFD(false); return;
+  }
   if (posA === 0) { posB = 0; posB3d = 0; return; }
   posB   = [sx, sy];
   posB3d = screen2Pt(posB, hZoom);
