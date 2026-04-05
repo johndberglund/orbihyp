@@ -5,22 +5,22 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // ── E state ───────────────────────────────────────────────────────────────────
-var eOrbi, originFD, eGenMaps, paramPtList, originFDCent;
+var eOrbi, modelFD, eGenMaps, paramPtList, modelFDCent;
 var eGenMats;
 var eScale  = 150;   // pixels per unit length
 var eTransX = 0;     // screen X of world origin (set by main.js init/resize)
 var eTransY = 0;     // screen Y of world origin
 
-var eMoveMat      = [[1,0,0],[0,1,0],[0,0,1]]; // similarity: shapeFD → world
-var eShapeFD      = null;   // mutable working shape (copy of originFD)
+var eHomeMat      = [[1,0,0],[0,1,0],[0,0,1]]; // similarity: shapeFD → world
+var eShapeFD      = null;   // mutable working shape (copy of modelFD)
 var eParamVerts   = [];     // indices of movable param endpoints in eShapeFD
 var eParamDragIdx = -1;     // which handle is being dragged: 0=v1, 1=second, -1=none
 var eShapeNum  = -1;        // edit mode: index of selected stack item (-1 = none)
 var eControlPt =  0;        // edit mode: which endpoint is selected (1 or 2)
 var ePosA = null, ePosB = null;  // line drawing: start/end screen coords [sx,sy]
 var _ePanStart  = null;          // pan drag: start screen pos
-var _ePanOrigin = null;          // pan drag: [eTransX,eTransY] at press
-var eNeighborMats = null;        // BFS tile matrices (canonical space)
+var _ePanModel = null;          // pan drag: [eTransX,eTransY] at press
+var eTownMats = null;        // BFS tile matrices (canonical space)
 
 // ── E coordinate conversion ───────────────────────────────────────────────────
 // Accepts [x,y] or [x,y,1] — only first two components used.
@@ -41,138 +41,138 @@ function eInvSimilarity(M) {
           [0, 0, 1]];
 }
 
-// Return the current working shape (falls back to originFD if not yet set).
-function eGetShapeFD() { return eShapeFD || originFD; }
+// Return the current working shape (falls back to modelFD if not yet set).
+function eGetShapeFD() { return eShapeFD || modelFD; }
 
 // ── eSetGroup ─────────────────────────────────────────────────────────────────
 function eSetGroup(idx) {
   eOrbi = idx;
-  eBuildOriginFD();
+  eBuildModelFD();
   eBuildGenMats();
 }
 
-// ── eBuildOriginFD ────────────────────────────────────────────────────────────
-function eBuildOriginFD() {
+// ── eBuildModelFD ────────────────────────────────────────────────────────────
+function eBuildModelFD() {
   paramPtList = [0];
   var s3h = 0.86602540378443864676372317075294; // sqrt(3)/2
   var P, Q;
   switch (eOrbi) {
     case 0:  // *632
-      originFD = [[0,0],[.5,0],[.5,s3h]];
-      originFDCent = [1/3, s3h/3];
+      modelFD = [[0,0],[.5,0],[.5,s3h]];
+      modelFDCent = [1/3, s3h/3];
       eGenMaps = [[0,0],[1,0],[2,0]];
-      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
+      P = modelFD[0]; Q = modelFD[1]; paramPtList.push([P,Q]);
       break;
     case 1:  // 632
-      originFD = [[0,0],[1,0],[.5,s3h]];
-      originFDCent = [.5, s3h/3];
+      modelFD = [[0,0],[1,0],[.5,s3h]];
+      modelFDCent = [.5, s3h/3];
       eGenMaps = [[0,1],[2,1],[1,1]];
-      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
+      P = modelFD[0]; Q = modelFD[1]; paramPtList.push([P,Q]);
       break;
     case 2:  // *442
-      originFD = [[0,0],[1,0],[0,1]];
-      originFDCent = [1/3, 1/3];
+      modelFD = [[0,0],[1,0],[0,1]];
+      modelFDCent = [1/3, 1/3];
       eGenMaps = [[0,0],[1,0],[2,0]];
-      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
+      P = modelFD[0]; Q = modelFD[1]; paramPtList.push([P,Q]);
       break;
     case 3:  // 442
-      originFD = [[0,0],[1,0],[1,1],[0,1]];
-      originFDCent = [.5, .5];
+      modelFD = [[0,0],[1,0],[1,1],[0,1]];
+      modelFDCent = [.5, .5];
       eGenMaps = [[3,1],[2,1],[1,1],[0,1]];
-      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
+      P = modelFD[0]; Q = modelFD[1]; paramPtList.push([P,Q]);
       break;
     case 4:  // 4*2
-      originFD = [[0,0],[1,0],[0,1]];
-      originFDCent = [1/3, 1/3];
+      modelFD = [[0,0],[1,0],[0,1]];
+      modelFDCent = [1/3, 1/3];
       eGenMaps = [[2,1],[1,0],[0,1]];
-      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
+      P = modelFD[0]; Q = modelFD[1]; paramPtList.push([P,Q]);
       break;
     case 5:  // *333
-      originFD = [[0,0],[1,0],[.5,s3h]];
-      originFDCent = [.5, s3h/3];
+      modelFD = [[0,0],[1,0],[.5,s3h]];
+      modelFDCent = [.5, s3h/3];
       eGenMaps = [[0,0],[1,0],[2,0]];
-      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
+      P = modelFD[0]; Q = modelFD[1]; paramPtList.push([P,Q]);
       break;
     case 6:  // 333
-      originFD = [[0,0],[1,0],[1.5,s3h],[.5,s3h]];
-      originFDCent = [.75, s3h/2];
+      modelFD = [[0,0],[1,0],[1.5,s3h],[.5,s3h]];
+      modelFDCent = [.75, s3h/2];
       eGenMaps = [[1,1],[0,1],[3,1],[2,1]];
-      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
+      P = modelFD[0]; Q = modelFD[1]; paramPtList.push([P,Q]);
       break;
     case 7:  // 3*3
-      originFD = [[0,0],[.5,-s3h],[.5,s3h]];
-      originFDCent = [1/3, 0];
+      modelFD = [[0,0],[.5,-s3h],[.5,s3h]];
+      modelFDCent = [1/3, 0];
       eGenMaps = [[2,1],[1,0],[0,1]];
-      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
+      P = modelFD[0]; Q = modelFD[1]; paramPtList.push([P,Q]);
       break;
     case 8:  // *2222
-      originFD = [[0,0],[1,0],[1,.5],[0,.5]];
-      originFDCent = [.5, .25];
+      modelFD = [[0,0],[1,0],[1,.5],[0,.5]];
+      modelFDCent = [.5, .25];
       eGenMaps = [[0,0],[1,0],[2,0],[3,0]];
-      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
-      Q = originFD[3]; paramPtList.push([P,Q]);
+      P = modelFD[0]; Q = modelFD[1]; paramPtList.push([P,Q]);
+      Q = modelFD[3]; paramPtList.push([P,Q]);
       break;
     case 9:  // 2*22
-      originFD = [[0,0],[1,0],[0,.5]];
-      originFDCent = [1/3, 1/6];
+      modelFD = [[0,0],[1,0],[0,.5]];
+      modelFDCent = [1/3, 1/6];
       eGenMaps = [[0,0],[1,1],[2,0]];
-      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
-      Q = originFD[2]; paramPtList.push([P,Q]);
+      P = modelFD[0]; Q = modelFD[1]; paramPtList.push([P,Q]);
+      Q = modelFD[2]; paramPtList.push([P,Q]);
       break;
     case 10:  // 22*
-      originFD = [[0,0],[1,0],[1,.5],[0,.5]];
-      originFDCent = [.5, .25];
+      modelFD = [[0,0],[1,0],[1,.5],[0,.5]];
+      modelFDCent = [.5, .25];
       eGenMaps = [[0,1],[1,0],[2,1],[3,0]];
-      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
-      Q = originFD[3]; paramPtList.push([P,Q]);
+      P = modelFD[0]; Q = modelFD[1]; paramPtList.push([P,Q]);
+      Q = modelFD[3]; paramPtList.push([P,Q]);
       break;
     case 11:  // 22×
-      originFD = [[0,0],[1,0],[1,.5],[0,.5]];
-      originFDCent = [.5, .25];
+      modelFD = [[0,0],[1,0],[1,.5],[0,.5]];
+      modelFDCent = [.5, .25];
       eGenMaps = [[0,1],[3,0],[2,1],[1,0]];
-      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
-      Q = originFD[3]; paramPtList.push([P,Q]);
+      P = modelFD[0]; Q = modelFD[1]; paramPtList.push([P,Q]);
+      Q = modelFD[3]; paramPtList.push([P,Q]);
       break;
     case 12:  // 2222
-      originFD = [[0,0],[1,0],[1.5,1],[.5,1]];
-      originFDCent = [.75, .5];
+      modelFD = [[0,0],[1,0],[1.5,1],[.5,1]];
+      modelFDCent = [.75, .5];
       eGenMaps = [[0,1],[3,1],[2,1],[1,1]];
-      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
-      Q = originFD[3]; paramPtList.push([P,Q]);
+      P = modelFD[0]; Q = modelFD[1]; paramPtList.push([P,Q]);
+      Q = modelFD[3]; paramPtList.push([P,Q]);
       break;
     case 13:  // **
-      originFD = [[0,0],[1,0],[1,.5],[0,.5]];
-      originFDCent = [.5, .25];
+      modelFD = [[0,0],[1,0],[1,.5],[0,.5]];
+      modelFDCent = [.5, .25];
       eGenMaps = [[0,0],[3,1],[2,0],[1,1]];
-      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
-      Q = originFD[3]; paramPtList.push([P,Q]);
+      P = modelFD[0]; Q = modelFD[1]; paramPtList.push([P,Q]);
+      Q = modelFD[3]; paramPtList.push([P,Q]);
       break;
     case 14:  // *×
-      originFD = [[0,0],[1,0],[1,.5],[0,.5]];
-      originFDCent = [.5, .25];
+      modelFD = [[0,0],[1,0],[1,.5],[0,.5]];
+      modelFDCent = [.5, .25];
       eGenMaps = [[0,0],[3,0],[2,0],[1,0]];
-      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
-      Q = originFD[3]; paramPtList.push([P,Q]);
+      P = modelFD[0]; Q = modelFD[1]; paramPtList.push([P,Q]);
+      Q = modelFD[3]; paramPtList.push([P,Q]);
       break;
     case 15:  // ××
-      originFD = [[0,0],[1,0],[1,.5],[0,.5]];
-      originFDCent = [.5, .25];
+      modelFD = [[0,0],[1,0],[1,.5],[0,.5]];
+      modelFDCent = [.5, .25];
       eGenMaps = [[2,1],[3,0],[0,1],[1,0]];
-      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
-      Q = originFD[3]; paramPtList.push([P,Q]);
+      P = modelFD[0]; Q = modelFD[1]; paramPtList.push([P,Q]);
+      Q = modelFD[3]; paramPtList.push([P,Q]);
       break;
     case 16:  // o
-      originFD = [[0,0],[1,0],[1.5,1],[.5,1]];
-      originFDCent = [.75, .5];
+      modelFD = [[0,0],[1,0],[1.5,1],[.5,1]];
+      modelFDCent = [.75, .5];
       eGenMaps = [[2,1],[3,1],[0,1],[1,1]];
-      P = originFD[0]; Q = originFD[1]; paramPtList.push([P,Q]);
-      Q = originFD[3]; paramPtList.push([P,Q]);
+      P = modelFD[0]; Q = modelFD[1]; paramPtList.push([P,Q]);
+      Q = modelFD[3]; paramPtList.push([P,Q]);
       break;
   }
 
   // Initialise mutable interactive state
-  eShapeFD    = originFD.map(function(v) { return v.slice(); });
-  eMoveMat    = [[1,0,0],[0,1,0],[0,0,1]];
+  eShapeFD    = modelFD.map(function(v) { return v.slice(); });
+  eHomeMat    = [[1,0,0],[0,1,0],[0,0,1]];
   eParamVerts = (eOrbi >= 8) ? [1, (eOrbi === 9 ? 2 : 3)] : [1];
 }
 
@@ -245,13 +245,13 @@ function eDrawPoly(ctx, verts, fillStyle, strokeStyle) {
   if (strokeStyle) { ctx.strokeStyle = strokeStyle; ctx.stroke(); }
 }
 
-// ── eBuildNeighborMats ────────────────────────────────────────────────────────
+// ── eBuildTownMats ────────────────────────────────────────────────────────
 // BFS outward from identity in canonical space, collecting every tile whose
 // world-space centre falls within the canvas bounds + one maxDist margin.
 // canvasW, canvasH: pixel dimensions of the canvas element.
-function eBuildNeighborMats(canvasW, canvasH) {
+function eBuildTownMats(canvasW, canvasH) {
   var ident = [[1,0,0],[0,1,0],[0,0,1]];
-  if (!eGenMats || eGenMats.length === 0) { eNeighborMats = [ident]; return; }
+  if (!eGenMats || eGenMats.length === 0) { eTownMats = [ident]; return; }
 
   // Use vertex average of current shape as the canonical centre.
   // This stays correct even after eShapeFD has been modified by the user.
@@ -270,8 +270,8 @@ function eBuildNeighborMats(canvasW, canvasH) {
   var maxDist    = Math.max.apply(null, dists);
   var sameThresh = minDist * 0.4; // centres closer than this are the same tile
 
-  // Scale factor of eMoveMat (canonical → world stretch).
-  var a = eMoveMat[0][0], b = eMoveMat[1][0];
+  // Scale factor of eHomeMat (canonical → world stretch).
+  var a = eHomeMat[0][0], b = eHomeMat[1][0];
   var s = Math.max(Math.sqrt(a*a + b*b), 1e-9);
 
   // Canvas bounds in world space.
@@ -294,7 +294,7 @@ function eBuildNeighborMats(canvasW, canvasH) {
       var newCent = multMatVect(newMat, [cent[0], cent[1], 1]);
 
       // World-space bounds check.
-      var wc = multMatVect(eMoveMat, newCent);
+      var wc = multMatVect(eHomeMat, newCent);
       if (wc[0] < xMin || wc[0] > xMax || wc[1] < yMin || wc[1] > yMax) continue;
 
       // Duplicate check in canonical space.
@@ -307,7 +307,7 @@ function eBuildNeighborMats(canvasW, canvasH) {
     }
     idx++;
   }
-  eNeighborMats = mats;
+  eTownMats = mats;
 }
 
 // ── Shape drawing helper ──────────────────────────────────────────────────────
@@ -355,18 +355,18 @@ function eDraw(ctx, c) {
   ctx.fillRect(0, 0, c.width, c.height);
 
   // Build full neighbour list for this frame (identity tile is index 0).
-  eBuildNeighborMats(c.width, c.height);
-  var nm = eNeighborMats;
+  eBuildTownMats(c.width, c.height);
+  var nm = eTownMats;
 
   // Draw all tile FDs: neighbours first (outline only), origin on top (beige fill).
   ctx.lineWidth = 1;
   for (var k = 1; k < nm.length; k++) {
-    var M   = multMatMat(eMoveMat, nm[k]);
+    var M   = multMatMat(eHomeMat, nm[k]);
     var nbr = fd.map(function(v) { return multMatVect(M, [v[0],v[1],1]); });
     eDrawPoly(ctx, nbr, null, '#aac');
   }
   ctx.lineWidth = 1.5;
-  var worldFD = fd.map(function(v) { return multMatVect(eMoveMat, [v[0],v[1],1]); });
+  var worldFD = fd.map(function(v) { return multMatVect(eHomeMat, [v[0],v[1],1]); });
   eDrawPoly(ctx, worldFD, 'rgba(255,240,200,0.8)', '#888');
 
   // ── Stack shapes tiled through all neighbour mats ─────────────────────────
@@ -375,30 +375,30 @@ function eDraw(ctx, c) {
     ctx.strokeStyle = shape[3];
     ctx.lineWidth   = 1.5;
     for (var t = 0; t < nm.length; t++) {
-      eDrawShapeWithMat(ctx, shape, multMatMat(eMoveMat, nm[t]));
+      eDrawShapeWithMat(ctx, shape, multMatMat(eHomeMat, nm[t]));
     }
   }
 
   // ── Preview shape being drawn ─────────────────────────────────────────────
   if (ePosA !== null && ePosB !== null && mode >= 1) {
-    var invM = eInvSimilarity(eMoveMat);
+    var invM = eInvSimilarity(eHomeMat);
     var P = multMatVect(invM, eScreen2Vect(ePosA[0], ePosA[1]));
     var Q = multMatVect(invM, eScreen2Vect(ePosB[0], ePosB[1]));
     var preview = [mode === 1 ? 1 : mode, P, Q, color, fill];
     ctx.strokeStyle = color;
     ctx.lineWidth   = 1.5;
     for (var t = 0; t < nm.length; t++) {
-      eDrawShapeWithMat(ctx, preview, multMatMat(eMoveMat, nm[t]));
+      eDrawShapeWithMat(ctx, preview, multMatMat(eHomeMat, nm[t]));
     }
   }
 
   // ── Parameter edit UI (green) — shown in edit mode only ──────────────────
   if (mode === 0) {
-    var s0 = eVect2Screen(multMatVect(eMoveMat, [0,0,1]));
+    var s0 = eVect2Screen(multMatVect(eHomeMat, [0,0,1]));
 
     eParamVerts.forEach(function(pvIdx) {
       var vp = fd[pvIdx];
-      var sw = eVect2Screen(multMatVect(eMoveMat, [vp[0],vp[1],1]));
+      var sw = eVect2Screen(multMatVect(eHomeMat, [vp[0],vp[1],1]));
 
       // Green line from v0 to handle
       ctx.beginPath();
@@ -420,7 +420,7 @@ function eDraw(ctx, c) {
     for (var si = 0; si < stack.length; si++) {
       for (var cp = 1; cp <= 2; cp++) {
         var p  = stack[si][cp];
-        var sc = eVect2Screen(multMatVect(eMoveMat, [p[0], p[1], 1]));
+        var sc = eVect2Screen(multMatVect(eHomeMat, [p[0], p[1], 1]));
         ctx.beginPath();
         ctx.rect(sc[0]-r, sc[1]-r, r*2, r*2);
         ctx.fillStyle = (si === eShapeNum && cp === eControlPt) ? 'yellow' : 'white';
@@ -450,14 +450,14 @@ function eMousePressed(sx, sy) {
   if (mode === -1) {
     // Pan: record start
     _ePanStart  = [sx, sy];
-    _ePanOrigin = [eTransX, eTransY];
+    _ePanModel = [eTransX, eTransY];
     return;
   }
 
   // Hit-test param handles (works in all non-pan modes)
   eParamDragIdx = -1;
   for (var i = 0; i < eParamVerts.length; i++) {
-    var wv = multMatVect(eMoveMat, [fd[eParamVerts[i]][0], fd[eParamVerts[i]][1], 1]);
+    var wv = multMatVect(eHomeMat, [fd[eParamVerts[i]][0], fd[eParamVerts[i]][1], 1]);
     if (_eDistSq(sx, sy, wv) < _eHitR2) {
       eParamDragIdx = i;
       break;
@@ -473,7 +473,7 @@ function eMousePressed(sx, sy) {
     for (var i = 0; i < stack.length && !found; i++) {
       for (var cp = 1; cp <= 2; cp++) {
         var p  = stack[i][cp];
-        var sc = eVect2Screen(multMatVect(eMoveMat, [p[0], p[1], 1]));
+        var sc = eVect2Screen(multMatVect(eHomeMat, [p[0], p[1], 1]));
         if (Math.abs(sx - sc[0]) < r && Math.abs(sy - sc[1]) < r) {
           eShapeNum = i; eControlPt = cp; found = true; break;
         }
@@ -490,15 +490,15 @@ function eMousePressed(sx, sy) {
 function eMouseMoved(sx, sy) {
   // ── Pan ──────────────────────────────────────────────────────────────────
   if (mode === -1 && _ePanStart !== null) {
-    eTransX = _ePanOrigin[0] + (sx - _ePanStart[0]);
-    eTransY = _ePanOrigin[1] + (sy - _ePanStart[1]);
+    eTransX = _ePanModel[0] + (sx - _ePanStart[0]);
+    eTransY = _ePanModel[1] + (sy - _ePanStart[1]);
     draw();
     return;
   }
 
   // ── Edit-mode control-point drag ─────────────────────────────────────────
   if (mode === 0 && eShapeNum >= 0) {
-    var invM = eInvSimilarity(eMoveMat);
+    var invM = eInvSimilarity(eHomeMat);
     var pC   = multMatVect(invM, eScreen2Vect(sx, sy));
     stack[eShapeNum][eControlPt] = [pC[0], pC[1]];
     draw();
@@ -511,13 +511,13 @@ function eMouseMoved(sx, sy) {
     var p  = eScreen2Vect(sx, sy);
 
     if (eParamDragIdx === 0) {
-      // Drag v1: update eMoveMat (scale + rotation), keeping v0 world-fixed
-      var anchor = [eMoveMat[0][2], eMoveMat[1][2]];
+      // Drag v1: update eHomeMat (scale + rotation), keeping v0 world-fixed
+      var anchor = [eHomeMat[0][2], eHomeMat[1][2]];
       var v1     = fd[1];
-      eMoveMat = eIsomSeg2Seg([0,0], [v1[0],v1[1]], anchor, [p[0],p[1]]);
+      eHomeMat = eIsomSeg2Seg([0,0], [v1[0],v1[1]], anchor, [p[0],p[1]]);
     } else {
       // Drag second param: update eShapeFD shape
-      var pC    = multMatVect(eInvSimilarity(eMoveMat), [p[0],p[1],1]);
+      var pC    = multMatVect(eInvSimilarity(eHomeMat), [p[0],p[1],1]);
       var pvIdx = eParamVerts[1];
       var v1    = fd[1];
       var newPos;
@@ -560,7 +560,7 @@ function eMouseReleased(sx, sy) {
 
   // Commit line/polygon to stack
   if (ePosA !== null && ePosB !== null && mode >= 1) {
-    var invM = eInvSimilarity(eMoveMat);
+    var invM = eInvSimilarity(eHomeMat);
     var P    = multMatVect(invM, eScreen2Vect(ePosA[0], ePosA[1]));
     var Q    = multMatVect(invM, eScreen2Vect(ePosB[0], ePosB[1]));
     stack.push([mode === 1 ? 1 : mode,

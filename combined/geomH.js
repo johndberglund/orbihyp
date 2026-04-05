@@ -16,15 +16,15 @@ var scrCenterY = 300;
 // ── H view state ──────────────────────────────────────────────────────────────
 
 var hZoom           = 1;
-var moveMat         = [[1,0,0],[0,1,0],[0,0,1]];
-var lastGoodMoveMat = [[1,0,0],[0,1,0],[0,0,1]];
+var homeMat         = [[1,0,0],[0,1,0],[0,0,1]];
+var lastGoodHomeMat = [[1,0,0],[0,1,0],[0,0,1]];
 var tempMat         = [[1,0,0],[0,1,0],[0,0,1]];
 var posA3d = 0, posB3d = 0;
 var posA   = 0, posB   = 0;   // screen coords (or 0 when not drawing)
 var shapeNum = -1, controlPt = 1, editBoxSize = 8;
-var baseFDIdx  = 0;
+var homeFDIdx  = 0;
 var panBestI = 0, panBestJ = 1, panDet = 1;
-var moveMatAtPress;
+var homeMatAtPress;
 var paramNum = -1, paramEnd = -1;
 var paramDragFixed, paramDragLine, paramDragFixedScene, paramDragFlip;
 var paramDragLineView, paramDragAnchorView, paramDragTangentView, paramDragLenPQ, paramDragT0;
@@ -33,9 +33,10 @@ var paramDragLineView, paramDragAnchorView, paramDragTangentView, paramDragLenPQ
 
 var atomList = [], firstInnerMatch;
 var stepEdges, match, glueMatch, borderFD, genMaps;
-var indexedCents, uniqGens, coords2Drop, neighborMaps;
-var params, atomPtList, originFD, originFDCent, recenterMat, paramPtList;
-var fdArea, allGenMats, allMappedCents, genMats, neighborCents, neighborMats;
+var indexedCents, uniqGens, coords2Drop, townMaps;
+var params, atomPtList, modelFD, modelFDCent, recenterMat, paramPtList;
+var fdArea, allGenMats, allMappedCents, genMats, townCents, townMats;
+var yardFD, yardFDCent;
 var specialPts = [], reflEdges = [];
 var maxT;
 
@@ -207,7 +208,7 @@ function invMat(M) {
 }
 
 //***
-function getInvMove() { return invMat(moveMat); }
+function getInvHome() { return invMat(homeMat); }
 
 // ── Triangle solvers ──────────────────────────────────────────────────────────
 
@@ -700,15 +701,15 @@ function buildBorderFD() {
 }
 
 function buildAllGenMats() {
-  let n = originFD.length;
+  let n = modelFD.length;
   allGenMats = [];
   for (let i = 0; i < n; i++) {
     if (genMaps[i] === null) { allGenMats.push(null); continue; }
     let [j, orient] = genMaps[i];
-    let Pi = originFD[i], Qi = originFD[(i + 1) % n];
+    let Pi = modelFD[i], Qi = modelFD[(i + 1) % n];
     if (orient === 0) { allGenMats.push(hReflMat(hPoints2Line(Pi, Qi))); continue; }
     if (orient === 1) {
-      let Pj = originFD[j], Qj = originFD[(j + 1) % n];
+      let Pj = modelFD[j], Qj = modelFD[(j + 1) % n];
       allGenMats.push(hIsomSeg2Seg(Pi, Qi, Qj, Pj)); continue;
     }
     let stepType = 0, twist = 0;
@@ -726,7 +727,7 @@ function buildAllGenMats() {
       if (found) break;
     }
     if (j !== i) {
-      let Pj = originFD[j], Qj = originFD[(j + 1) % n];
+      let Pj = modelFD[j], Qj = modelFD[(j + 1) % n];
       allGenMats.push(hIsomSeg2Seg(Pi, Qi, Qj, Pj, twist));
     } else {
       switch (stepType) {
@@ -747,8 +748,8 @@ function buildAllGenMats() {
 function buildAllMappedCents() {
   allMappedCents = allGenMats.map(mat => {
     if (mat === null) return null;
-    let cent = multMatVect(mat, originFDCent);
-    return hDist(cent, originFDCent) < 0.1 ? null : cent;
+    let cent = multMatVect(mat, modelFDCent);
+    return hDist(cent, modelFDCent) < 0.1 ? null : cent;
   });
   for (let i = 0; i < allGenMats.length; i++) {
     if (allMappedCents[i] === null) allGenMats[i] = null;
@@ -770,41 +771,46 @@ function buildIndexedCents() {
 
 function buildGenMats() { genMats = uniqGens.map(i => allGenMats[i]); }
 
-function buildNeighborMats() {
-  let maxVertT = Math.max(...originFD.map(p => p[0]));
+function buildYardFD() {
+  yardFD     = genMats.map(m => modelFD.map(p => multMatVect(m, p)));
+  yardFDCent = genMats.map(m => multMatVect(m, modelFDCent));
+}
+
+function buildTownMats() {
+  let maxVertT = Math.max(...modelFD.map(p => p[0]));
   maxT = Math.min(1000, Math.max(30, Math.round(10 * fdArea + maxVertT)));
-  neighborMats  = [identity];
-  neighborCents = [originFDCent];
-  neighborMaps  = [];
+  townMats  = [identity];
+  townCents = [modelFDCent];
+  townMaps  = [];
   let matIndex = 0;
-  while (matIndex < neighborMats.length && neighborMats.length < 5000) {
-    let parentSeq = matIndex === 0 ? [] : neighborMaps[matIndex - 1];
+  while (matIndex < townMats.length && townMats.length < 5000) {
+    let parentSeq = matIndex === 0 ? [] : townMaps[matIndex - 1];
     for (let k = 0; k < genMats.length; k++) {
-      let newMat  = multMatMat(genMats[k], neighborMats[matIndex]);
-      let newCent = multMatVect(newMat, originFDCent);
+      let newMat  = multMatMat(genMats[k], townMats[matIndex]);
+      let newCent = multMatVect(newMat, modelFDCent);
       if (newCent[0] >= maxT) continue;
       let isNew = true;
-      for (let j = 0; j < neighborCents.length; j++) {
-        if (hDist(neighborCents[j], newCent) < 0.001) { isNew = false; break; }
+      for (let j = 0; j < townCents.length; j++) {
+        if (hDist(townCents[j], newCent) < 0.001) { isNew = false; break; }
       }
       if (isNew) {
-        neighborMats.push(newMat);
-        neighborCents.push(newCent);
-        neighborMaps.push([k, ...parentSeq]);
+        townMats.push(newMat);
+        townCents.push(newCent);
+        townMaps.push([k, ...parentSeq]);
       }
     }
     matIndex++;
   }
 }
 
-function buildOriginFD() { originFD = borderFD.map(([atom, vert]) => atomPtList[atom][vert]); }
+function buildModelFD() { modelFD = borderFD.map(([atom, vert]) => atomPtList[atom][vert]); }
 
-function buildOriginFDCent() {
-  let n = originFD.length;
-  if (n < 3) { originFDCent = originFD[0]; return; }
-  let A = originFD[0], totalArea = 0, cx = 0, cy = 0, cz = 0;
+function buildModelFDCent() {
+  let n = modelFD.length;
+  if (n < 3) { modelFDCent = modelFD[0]; return; }
+  let A = modelFD[0], totalArea = 0, cx = 0, cy = 0, cz = 0;
   for (let i = 1; i < n - 1; i++) {
-    let B = originFD[i], C = originFD[i + 1];
+    let B = modelFD[i], C = modelFD[i + 1];
     let area = hTriangleArea(A, B, C);
     if (!isFinite(area) || area < epsilon) continue;
     let triCent = hNorm(vectSum(vectSum(A, B), C));
@@ -812,7 +818,7 @@ function buildOriginFDCent() {
     totalArea += area;
   }
   fdArea = totalArea;
-  originFDCent = hNorm([cx / totalArea, cy / totalArea, cz / totalArea]);
+  modelFDCent = hNorm([cx / totalArea, cy / totalArea, cz / totalArea]);
 }
 
 function buildParamPtList() {
@@ -865,11 +871,11 @@ function buildAtomPtList() {
 function rebuildGeom() {
   buildAtomPtList();
   buildParamPtList();
-  buildOriginFD();
-  buildOriginFDCent();
-  recenterMat = hTransMat(originFDCent, [1, 0, 0]);
-  originFD = originFD.map(p => multMatVect(recenterMat, p));
-  originFDCent = multMatVect(recenterMat, originFDCent);
+  buildModelFD();
+  buildModelFDCent();
+  recenterMat = hTransMat(modelFDCent, [1, 0, 0]);
+  modelFD = modelFD.map(p => multMatVect(recenterMat, p));
+  modelFDCent = multMatVect(recenterMat, modelFDCent);
   for (let j = 1; j < paramPtList.length; j++) {
     if (paramPtList[j] === null) continue;
     paramPtList[j] = [
@@ -883,8 +889,9 @@ function rebuildGeom() {
   buildAllMappedCents();
   buildIndexedCents();
   buildGenMats();
-  buildNeighborMats();
-  updateBaseFD();
+  buildYardFD();
+  buildTownMats();
+  updateHomeFD();
   buildSpecialPts();
 }
 
@@ -897,7 +904,7 @@ function pt2Screen(P, zoom) {
   return [x, y];
 }
 
-function dispPt(p) { return pt2Screen(multMatVect(moveMat, p), hZoom); }
+function dispPt(p) { return pt2Screen(multMatVect(homeMat, p), hZoom); }
 
 function screen2Pt(scrPt, zoom) {
   let x = (scrPt[0] - scrCenterX) / scrRadius;
@@ -979,23 +986,23 @@ function nGonVerts(C, V, n) {
 
 // ── Base FD alignment & snap ──────────────────────────────────────────────────
 
-function updateBaseFD() {
-  if (!neighborCents || neighborCents.length === 0) { baseFDIdx = 0; return; }
+function updateHomeFD() {
+  if (!townCents || townCents.length === 0) { homeFDIdx = 0; return; }
   let minT = Infinity, bestIdx = 0;
-  for (let i = 0; i < neighborCents.length; i++) {
-    let t = multMatVect(moveMat, neighborCents[i])[0];
+  for (let i = 0; i < townCents.length; i++) {
+    let t = multMatVect(homeMat, townCents[i])[0];
     if (t < minT) { minT = t; bestIdx = i; }
   }
-  baseFDIdx = bestIdx;
+  homeFDIdx = bestIdx;
 }
 
 function toPoincareFDRep(P) {
   let cur = hNorm(P), path = [], improved = true;
   while (improved) {
     improved = false;
-    let d = hDist(cur, originFDCent), bestK = -1, bestD = d;
+    let d = hDist(cur, modelFDCent), bestK = -1, bestD = d;
     for (let k = 0; k < genMats.length; k++) {
-      let dc = hDist(multMatVect(invMat(genMats[k]), cur), originFDCent);
+      let dc = hDist(multMatVect(invMat(genMats[k]), cur), modelFDCent);
       if (dc < bestD - epsilon || (Math.abs(dc - bestD) < epsilon && bestK < 0)) {
         bestD = dc; bestK = k;
       }
@@ -1010,16 +1017,16 @@ function toPoincareFDRep(P) {
 
 function buildSpecialPts() {
   specialPts = []; reflEdges = [];
-  let n = originFD.length;
+  let n = modelFD.length;
   for (let i = 0; i < n; i++) {
     let gm = genMaps[i];
     if (gm && gm[1] === 0) {
-      let A = originFD[i], B = originFD[(i + 1) % n];
+      let A = modelFD[i], B = modelFD[(i + 1) % n];
       if (A[0] < 1000 && B[0] < 1000) reflEdges.push([A, B]);
     }
     let prev = (i - 1 + n) % n, gp = genMaps[prev], gi = genMaps[i];
     let op = gp ? gp[1] : null, oi = gi ? gi[1] : null;
-    let pt = originFD[i];
+    let pt = modelFD[i];
     if (pt[0] >= 1000) continue;
     if (op === 0 || oi === 0) { specialPts.push({pt, type: 'kali'}); continue; }
     if (op === 1 && oi === 1 && gp[0] === i && gi[0] === prev) {
@@ -1052,23 +1059,23 @@ function getSnappedPoint(P, screenPos) {
   return snapped || P;
 }
 
-function alignBaseFD(updateDragState) {
-  let viewCenterScene = hNorm(multMatVect(invMat(moveMat), [1,0,0]));
-  let bestMat = identity, bestCent = originFDCent, improved = true;
+function alignHomeFD(updateDragState) {
+  let viewCenterScene = hNorm(multMatVect(invMat(homeMat), [1,0,0]));
+  let bestMat = identity, bestCent = modelFDCent, improved = true;
   while (improved) {
     improved = false;
     for (let k = 0; k < genMats.length; k++) {
       let tryMat = multMatMat(genMats[k], bestMat);
-      let tryCent = multMatVect(tryMat, originFDCent);
+      let tryCent = multMatVect(tryMat, modelFDCent);
       if (hDist(tryCent, viewCenterScene) < hDist(bestCent, viewCenterScene) - 1e-6) {
         bestMat = tryMat; bestCent = tryCent; improved = true; break;
       }
     }
   }
-  if (hDist(bestCent, viewCenterScene) >= hDist(originFDCent, viewCenterScene) - 1e-6) return false;
-  let candidateMat = multMatMat(moveMat, bestMat);
+  if (hDist(bestCent, viewCenterScene) >= hDist(modelFDCent, viewCenterScene) - 1e-6) return false;
+  let candidateMat = multMatMat(homeMat, bestMat);
   let alignDet = matDet(candidateMat) < 0 ? -1 : 1;
-  let newScr = originFD.map(p => pt2Screen(multMatVect(candidateMat, p), hZoom));
+  let newScr = modelFD.map(p => pt2Screen(multMatVect(candidateMat, p), hZoom));
   let bI = 0, bJ = 1, pbd = -1;
   for (let i = 0; i < newScr.length; i++)
     for (let j = i+1; j < newScr.length; j++) {
@@ -1076,18 +1083,18 @@ function alignBaseFD(updateDragState) {
       let d = dx*dx+dy*dy;
       if (d > pbd) { pbd = d; bI = i; bJ = j; }
     }
-  let V0 = hNorm(multMatVect(candidateMat, originFD[bI]));
-  let V1 = hNorm(multMatVect(candidateMat, originFD[bJ]));
+  let V0 = hNorm(multMatVect(candidateMat, modelFD[bI]));
+  let V1 = hNorm(multMatVect(candidateMat, modelFD[bJ]));
   let newMat = alignDet < 0
-    ? hIsomSeg2SegFlip(originFD[bI], originFD[bJ], V0, V1)
-    : hIsomSeg2Seg(originFD[bI], originFD[bJ], V0, V1);
-  moveMat = (typeof newMat === 'string') ? candidateMat : newMat;
-  if (isFinite(moveMat[0][0]) && isFinite(moveMat[1][1]) && isFinite(moveMat[2][2]))
-    lastGoodMoveMat = moveMat.map(row => [...row]);
-  buildNeighborMats();
-  baseFDIdx = 0;
+    ? hIsomSeg2SegFlip(modelFD[bI], modelFD[bJ], V0, V1)
+    : hIsomSeg2Seg(modelFD[bI], modelFD[bJ], V0, V1);
+  homeMat = (typeof newMat === 'string') ? candidateMat : newMat;
+  if (isFinite(homeMat[0][0]) && isFinite(homeMat[1][1]) && isFinite(homeMat[2][2]))
+    lastGoodHomeMat = homeMat.map(row => [...row]);
+  buildTownMats();
+  homeFDIdx = 0;
   if (updateDragState) {
-    tempMat = moveMat.map(row => [...row]);
+    tempMat = homeMat.map(row => [...row]);
     panBestI = bI; panBestJ = bJ; panDet = alignDet;
   }
   return true;
@@ -1101,9 +1108,9 @@ function hReDo() {
   let cone     = JSON.parse(document.getElementById("cone").value);
   let kali     = JSON.parse(document.getElementById("kali").value);
 
-  moveMat = [[1,0,0],[0,1,0],[0,0,1]];
-  lastGoodMoveMat = [[1,0,0],[0,1,0],[0,0,1]];
-  baseFDIdx = 0;
+  homeMat = [[1,0,0],[0,1,0],[0,0,1]];
+  lastGoodHomeMat = [[1,0,0],[0,1,0],[0,0,1]];
+  homeFDIdx = 0;
   stepEdges = [0];
   params    = [0];
   atomList  = [];
@@ -1118,10 +1125,10 @@ function hReDo() {
 // ── hDraw — render hyperbolic scene ──────────────────────────────────────────
 
 function hDraw(ctx, c) {
-  // Recover from bad moveMat
-  if (!moveMat || !isFinite(moveMat[0][0]) || !isFinite(moveMat[1][1]) || !isFinite(moveMat[2][2])) {
-    moveMat = lastGoodMoveMat.map(row => [...row]);
-    buildNeighborMats(); updateBaseFD();
+  // Recover from bad homeMat
+  if (!homeMat || !isFinite(homeMat[0][0]) || !isFinite(homeMat[1][1]) || !isFinite(homeMat[2][2])) {
+    homeMat = lastGoodHomeMat.map(row => [...row]);
+    buildTownMats(); updateHomeFD();
   }
 
   // White background
@@ -1139,8 +1146,8 @@ function hDraw(ctx, c) {
   ctx.closePath();
 
   // FD tiles
-  if (neighborMats && originFD && originFD.length > 0) {
-    let vv = originFD.map(p => multMatVect(moveMat, multMatVect(neighborMats[baseFDIdx], p)));
+  if (townMats && modelFD && modelFD.length > 0) {
+    let vv = modelFD.map(p => multMatVect(homeMat, multMatVect(townMats[homeFDIdx], p)));
     if (gridMode) {
       ctx.beginPath();
       addGeodPolyPath(ctx, vv);
@@ -1154,9 +1161,9 @@ function hDraw(ctx, c) {
     if (gridMode) {
       ctx.strokeStyle = "lightgrey";
       ctx.lineWidth = 1;
-      for (let i = 0; i < neighborMats.length; i++) {
-        if (i === baseFDIdx) continue;
-        let vv2 = originFD.map(p => multMatVect(moveMat, multMatVect(neighborMats[i], p)));
+      for (let i = 0; i < townMats.length; i++) {
+        if (i === homeFDIdx) continue;
+        let vv2 = modelFD.map(p => multMatVect(homeMat, multMatVect(townMats[i], p)));
         ctx.beginPath();
         addGeodPolyPath(ctx, vv2);
         ctx.stroke();
@@ -1170,7 +1177,7 @@ function hDraw(ctx, c) {
     for (let j = 1; j < paramPtList.length; j++) {
       if (!paramPtList[j]) continue;
       let [P, Q, twist] = paramPtList[j];
-      let Pv = multMatVect(moveMat, P), Qv = multMatVect(moveMat, Q);
+      let Pv = multMatVect(homeMat, P), Qv = multMatVect(homeMat, Q);
       ctx.beginPath();
       ctx.moveTo(...pt2Screen(Pv, hZoom));
       addGeodEdge(ctx, Pv, Qv);
@@ -1197,23 +1204,23 @@ function hDraw(ctx, c) {
     }
   }
 
-  // Stack shapes tiled through neighborMats
-  if (stack.length > 0 && neighborMats) {
+  // Stack shapes tiled through townMats
+  if (stack.length > 0 && townMats) {
     for (let s = 0; s < stack.length; s++) {
       let shape = stack[s];
       ctx.strokeStyle = shape[3]; ctx.lineWidth = 1.5;
-      for (let t = 0; t < neighborMats.length; t++) {
-        let M = neighborMats[t];
+      for (let t = 0; t < townMats.length; t++) {
+        let M = townMats[t];
         if (shape[0] === 1) {
-          let Pv = multMatVect(moveMat, multMatVect(M, shape[1]));
-          let Qv = multMatVect(moveMat, multMatVect(M, shape[2]));
+          let Pv = multMatVect(homeMat, multMatVect(M, shape[1]));
+          let Qv = multMatVect(homeMat, multMatVect(M, shape[2]));
           ctx.beginPath();
           ctx.moveTo(...pt2Screen(Pv, hZoom));
           addGeodEdge(ctx, Pv, Qv);
           ctx.stroke();
         } else {
-          let Cv = multMatVect(moveMat, multMatVect(M, shape[1]));
-          let Vv = multMatVect(moveMat, multMatVect(M, shape[2]));
+          let Cv = multMatVect(homeMat, multMatVect(M, shape[1]));
+          let Vv = multMatVect(homeMat, multMatVect(M, shape[2]));
           let polyVerts = nGonVerts(Cv, Vv, shape[0]);
           ctx.beginPath();
           addGeodPolyPath(ctx, polyVerts);
@@ -1226,23 +1233,23 @@ function hDraw(ctx, c) {
   }
 
   // Preview current shape
-  if (posA !== 0 && posB !== 0 && mode >= 1 && neighborMats) {
-    let inv = getInvMove();
+  if (posA !== 0 && posB !== 0 && mode >= 1 && townMats) {
+    let inv = getInvHome();
     let P = multMatVect(inv, posA3d);
     let Q = multMatVect(inv, posB3d);
     ctx.strokeStyle = color; ctx.lineWidth = 1.5;
-    for (let t = 0; t < neighborMats.length; t++) {
-      let M = neighborMats[t];
+    for (let t = 0; t < townMats.length; t++) {
+      let M = townMats[t];
       if (mode === 1) {
-        let Pv = multMatVect(moveMat, multMatVect(M, P));
-        let Qv = multMatVect(moveMat, multMatVect(M, Q));
+        let Pv = multMatVect(homeMat, multMatVect(M, P));
+        let Qv = multMatVect(homeMat, multMatVect(M, Q));
         ctx.beginPath();
         ctx.moveTo(...pt2Screen(Pv, hZoom));
         addGeodEdge(ctx, Pv, Qv);
         ctx.stroke();
       } else {
-        let Cv = multMatVect(moveMat, multMatVect(M, P));
-        let Vv = multMatVect(moveMat, multMatVect(M, Q));
+        let Cv = multMatVect(homeMat, multMatVect(M, P));
+        let Vv = multMatVect(homeMat, multMatVect(M, Q));
         let polyVerts = nGonVerts(Cv, Vv, mode);
         ctx.beginPath();
         addGeodPolyPath(ctx, polyVerts);
@@ -1277,9 +1284,9 @@ function hMousePressed(sx, sy) {
   posA3d = screen2Pt(posA, hZoom);
 
   if (mode === -1) {
-    tempMat = moveMat.map(row => [...row]);
+    tempMat = homeMat.map(row => [...row]);
     panDet = matDet(tempMat) >= 0 ? 1 : -1;
-    let scrVerts = originFD.map(p => pt2Screen(multMatVect(moveMat, p), hZoom));
+    let scrVerts = modelFD.map(p => pt2Screen(multMatVect(homeMat, p), hZoom));
     panBestI = 0; panBestJ = 1; let panBestDist = -1;
     for (let i = 0; i < scrVerts.length; i++)
       for (let j = i+1; j < scrVerts.length; j++) {
@@ -1292,7 +1299,7 @@ function hMousePressed(sx, sy) {
 
   if (mode === 0) {
     shapeNum = -1; paramNum = -1;
-    moveMatAtPress = moveMat.map(row => [...row]);
+    homeMatAtPress = homeMat.map(row => [...row]);
     // hit-test twist markers (diamonds)
     for (let j = 1; paramPtList && j < paramPtList.length; j++) {
       if (!paramPtList[j]) continue;
@@ -1314,8 +1321,8 @@ function hMousePressed(sx, sy) {
           ? scalarVect(1/Math.sinh(dq), vectDiff(Q, scalarVect(Math.cosh(dq), dot)))
           : scalarVect(1/Math.sinh(d),  vectDiff(scalarVect(Math.cosh(d), Q), P));
         // Store in view space — immune to rebuildGeom recentering
-        paramDragLineView    = multMatVect(moveMat, hPoints2Line(P, Q));
-        paramDragTangentView = multMatVect(moveMat, V_dot);
+        paramDragLineView    = multMatVect(homeMat, hPoints2Line(P, Q));
+        paramDragTangentView = multMatVect(homeMat, V_dot);
         paramDragLenPQ = d;
         paramDragT0 = t0;
         return;
@@ -1328,18 +1335,18 @@ function hMousePressed(sx, sy) {
       let sP = dispPt(P), sQ = dispPt(Q);
       if (Math.abs(posA[0]-sP[0]) < editBoxSize && Math.abs(posA[1]-sP[1]) < editBoxSize) {
         paramNum = j; paramEnd = 0;
-        paramDragFixed = multMatVect(moveMat, Q);
+        paramDragFixed = multMatVect(homeMat, Q);
         paramDragFixedScene = Q;
         paramDragLine = hPoints2Line(P, Q);
-        paramDragFlip = matDet(moveMat) < 0;
+        paramDragFlip = matDet(homeMat) < 0;
         return;
       }
       if (Math.abs(posA[0]-sQ[0]) < editBoxSize && Math.abs(posA[1]-sQ[1]) < editBoxSize) {
         paramNum = j; paramEnd = 1;
-        paramDragFixed = multMatVect(moveMat, P);
+        paramDragFixed = multMatVect(homeMat, P);
         paramDragFixedScene = P;
         paramDragLine = hPoints2Line(P, Q);
-        paramDragFlip = matDet(moveMat) < 0;
+        paramDragFlip = matDet(homeMat) < 0;
         return;
       }
     }
@@ -1368,13 +1375,13 @@ function hMouseMoved(sx, sy) {
       paramPtList[paramNum][2] = t;
       if (stepEdges[paramNum] === 3) {
         buildAllGenMats(); buildAllMappedCents(); buildIndexedCents();
-        buildGenMats(); buildNeighborMats();
-        updateBaseFD();
+        buildGenMats(); buildTownMats();
+        updateHomeFD();
       }
       // stepEdge 8: don't rebuild during drag — just show dot position, rebuild on release
       return;
     }
-    let mouseScene = multMatVect(invMat(moveMatAtPress), posB3d);
+    let mouseScene = multMatVect(invMat(homeMatAtPress), posB3d);
     let F = hFootOfPerp(mouseScene, paramDragLine);
     let fixedPtScene = paramDragFixedScene;
     if (hDist(F, fixedPtScene) < epsilon * 100) return;
@@ -1385,7 +1392,7 @@ function hMouseMoved(sx, sy) {
     // Use the *actual* rebuilt distance so hIsomSeg2Seg's distance check always
     // passes, even when params[0] ≠ hDist(P_new,Q_new) (e.g. P6 crosscap verts).
     let d_actual   = hDist(P_new, Q_new);
-    let F_view_raw = multMatVect(moveMatAtPress, F);
+    let F_view_raw = multMatVect(homeMatAtPress, F);
     let d_raw      = hDist(paramDragFixed, F_view_raw);
     let F_view;
     if (d_raw > epsilon && d_actual > epsilon) {
@@ -1401,20 +1408,20 @@ function hMouseMoved(sx, sy) {
       ? hIsomSeg2Seg(P_new, Q_new, F_view, paramDragFixed, 0)
       : hIsomSeg2SegFlip(P_new, Q_new, F_view, paramDragFixed);
     if (typeof newMat !== 'string') {
-      moveMat = newMat;
+      homeMat = newMat;
     } else {
       // rebuildGeom() shifted the scene by recenterMat; compensate so the
-      // stale moveMat still points to the right place.
-      moveMat = multMatMat(moveMat, invMat(recenterMat));
-      if (isFinite(moveMat[0][0]) && isFinite(moveMat[1][1]) && isFinite(moveMat[2][2]))
-        lastGoodMoveMat = moveMat.map(row => [...row]);
+      // stale homeMat still points to the right place.
+      homeMat = multMatMat(homeMat, invMat(recenterMat));
+      if (isFinite(homeMat[0][0]) && isFinite(homeMat[1][1]) && isFinite(homeMat[2][2]))
+        lastGoodHomeMat = homeMat.map(row => [...row]);
     }
-    updateBaseFD();
+    updateHomeFD();
     return;
   }
 
   if (mode === 0 && shapeNum >= 0) {
-    let sceneP = multMatVect(invMat(moveMat), posB3d);
+    let sceneP = multMatVect(invMat(homeMat), posB3d);
     if (snapMode) sceneP = getSnappedPoint(sceneP, posB);
     stack[shapeNum][controlPt] = sceneP;
     return;
@@ -1424,14 +1431,14 @@ function hMouseMoved(sx, sy) {
   if (mode === -1) {
     let candidate = multMatMat(hTransMat(posA3d, posB3d), tempMat);
     if (isFinite(candidate[0][0])) {
-      let V0 = hNorm(multMatVect(candidate, originFD[panBestI]));
-      let V1 = hNorm(multMatVect(candidate, originFD[panBestJ]));
+      let V0 = hNorm(multMatVect(candidate, modelFD[panBestI]));
+      let V1 = hNorm(multMatVect(candidate, modelFD[panBestJ]));
       let newMat = panDet < 0
-        ? hIsomSeg2SegFlip(originFD[panBestI], originFD[panBestJ], V0, V1)
-        : hIsomSeg2Seg(originFD[panBestI], originFD[panBestJ], V0, V1);
-      moveMat = (typeof newMat !== 'string') ? newMat : candidate;
-      if (isFinite(moveMat[0][0]) && isFinite(moveMat[1][1]) && isFinite(moveMat[2][2]))
-        lastGoodMoveMat = moveMat.map(row => [...row]);
+        ? hIsomSeg2SegFlip(modelFD[panBestI], modelFD[panBestJ], V0, V1)
+        : hIsomSeg2Seg(modelFD[panBestI], modelFD[panBestJ], V0, V1);
+      homeMat = (typeof newMat !== 'string') ? newMat : candidate;
+      if (isFinite(homeMat[0][0]) && isFinite(homeMat[1][1]) && isFinite(homeMat[2][2]))
+        lastGoodHomeMat = homeMat.map(row => [...row]);
     }
   }
 }
@@ -1440,20 +1447,20 @@ function hMouseReleased(sx, sy) {
   if (mode === 0) {
     if (paramNum >= 0 && paramEnd === -1 && stepEdges[paramNum] === 8) {
       rebuildGeom();
-      // recenterMat shifted the scene; compensate moveMat so the view doesn't jump
-      moveMat = multMatMat(moveMat, invMat(recenterMat));
-      if (isFinite(moveMat[0][0]) && isFinite(moveMat[1][1]) && isFinite(moveMat[2][2]))
-        lastGoodMoveMat = moveMat.map(row => [...row]);
-      updateBaseFD();
+      // recenterMat shifted the scene; compensate homeMat so the view doesn't jump
+      homeMat = multMatMat(homeMat, invMat(recenterMat));
+      if (isFinite(homeMat[0][0]) && isFinite(homeMat[1][1]) && isFinite(homeMat[2][2]))
+        lastGoodHomeMat = homeMat.map(row => [...row]);
+      updateHomeFD();
     }
-    shapeNum = -1; paramNum = -1; posA = 0; alignBaseFD(false); return;
+    shapeNum = -1; paramNum = -1; posA = 0; alignHomeFD(false); return;
   }
   if (posA === 0) { posB = 0; posB3d = 0; return; }
   posB   = [sx, sy];
   posB3d = screen2Pt(posB, hZoom);
-  if (mode === -1) { alignBaseFD(false); }
+  if (mode === -1) { alignHomeFD(false); }
   if (mode >= 1) {
-    let inv = getInvMove();
+    let inv = getInvHome();
     let P = multMatVect(inv, posA3d);
     let Q = multMatVect(inv, posB3d);
     if (snapMode) {
