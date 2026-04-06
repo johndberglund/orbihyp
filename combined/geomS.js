@@ -101,12 +101,12 @@ function sSetOrb(idx, n) {
       break;
     case 10: // n*
       sMyRot = n;
-      sSymVects = [[0,1,0]];
+      sSymVects = [[0,1,0],[1,0,0]];
       sNumMaps = 2;
       break;
     case 11: // n×
       sMyRot = n;
-      sSymVects = [[0,1,0]];
+      sSymVects = [[0,1,0],[1,0,0]];
       sNumMaps = 2;
       break;
     case 12: // *nn
@@ -116,7 +116,7 @@ function sSetOrb(idx, n) {
       break;
     case 13: // nn
       sMyRot = n;
-      sSymVects = [[0,1,0]];
+      sSymVects = [[0,1,0],[1,0,0]];
       sNumMaps = 1;
       break;
   }
@@ -496,6 +496,12 @@ function sFDVerts() {
   }
   var Ehn = multMatVect(sRotMat(N, pi/n), E0);
   var E2n = multMatVect(sRotMat(N, 2*pi/n), E0);
+  var Ean = E0;
+  var Ebn = Ehn;
+  if (n % 2 != 0) {
+    Ean = multMatVect(sRotMat(N, pi/2/n), E0);
+    Ebn = multMatVect(sRotMat(N, -pi/2/n), E0);
+  }
   switch (sOrbi) {
     case 0: { // *532: s0=5-fold, normalize(sv[2])=2-fold edge midpoint, C=3-fold face center
       var phi2 = (3+Math.sqrt(5))/2;  // φ² = φ+1 ≈ 2.618
@@ -544,9 +550,9 @@ function sFDVerts() {
               sNormalize(vectSum(vectSum(s0, s1), sX)),
               sNormalize(vectSum(vectDiff(s1, s0), sX))];
     }
-    case 7: case 8:           return [N, E0, Ehn];
+    case 7: case 8:           return [N, Ean, Ebn];
     case 9: case 10: case 11: return [N, E0, E2n];
-    case 12:                  return [N, E0, S, Ehn];
+    case 12:                  return [N, Ebn, S, Ean];
     case 13:                  return [N, E0, S, E2n];
     default:                  return [N, E0, S];
   }
