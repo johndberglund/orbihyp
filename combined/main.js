@@ -14,6 +14,7 @@ var color    = "#000000";
 var fill     = 0;
 var gridMode = true;
 var snapMode = false;
+var morphMode = true;
 
 // ── Vector, Matrix utilities ──────────────────────────────────────────────────────────
 
@@ -221,6 +222,9 @@ function reDo() {
   try { cone = JSON.parse(document.getElementById("cone").value); } catch(e) { return; }
   try { kali = JSON.parse(document.getElementById("kali").value); } catch(e) { return; }
 
+  if (!morphMode) { stack = []; undoStack = []; }
+
+  var prevGeom = geom;
   var chi = computeChi(handle, crosscap, cone, kali);
   var EPS = 1e-9;
 
@@ -232,6 +236,24 @@ function reDo() {
     if (sg) { geom = 'S'; sSetOrb(sg.idx, sg.n); }
   } else {
     geom = 'H'; hReDo();
+  }
+
+  // Morph: warp all stack shapes into the new H FD.
+  // E shapes have 2-element points; lift them to the hyperboloid before warping.
+  if (morphMode && geom === 'H' && stack.length > 0) {
+    function toH(p) {
+      // H hyperboloid points have p[0] >= 1; S sphere and E 2D points do not.
+      if (p.length === 3 && p[0] >= 1.0) return p;
+      var x = p[0] || 0, y = (p.length >= 2 ? p[1] : 0) || 0;
+      return [Math.sqrt(1 + x*x + y*y), x, y];
+    }
+    stack = stack.map(shape => [
+      shape[0],
+      toPoincareFDRep(toH(shape[1])).pt,
+      toPoincareFDRep(toH(shape[2])).pt,
+      shape[3],
+      shape[4]
+    ]);
   }
 
   // Show zoom only for H; show opaque toggle only for S
@@ -340,6 +362,10 @@ function setGrid() {
 
 function setSnap() {
   snapMode = document.getElementById("snap").checked;
+}
+
+function setMorph() {
+  morphMode = document.getElementById("morph").checked;
 }
 
 function setOpaque() {

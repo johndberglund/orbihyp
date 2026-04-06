@@ -661,7 +661,7 @@ function sDraw(ctx, c) {
 
 var sPanPosA = null;
 var sEditShapeIdx = -1, sEditPtIdx = -1;
-var boxSize = 7;
+var boxSize = 4;
 
 function sMousePressed(sx, sy, shiftKey) {
   var pt3 = sScreen2vect(sx, sy, shiftKey);

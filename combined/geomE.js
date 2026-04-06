@@ -416,7 +416,7 @@ function eDraw(ctx, c) {
     });
 
     // ── Stack control-point boxes ─────────────────────────────────────────
-    var r = 8;
+    var r = 4;
     for (var si = 0; si < stack.length; si++) {
       for (var cp = 1; cp <= 2; cp++) {
         var p  = stack[si][cp];
@@ -468,7 +468,7 @@ function eMousePressed(sx, sy) {
   if (mode === 0) {
     // Hit-test stack control-point boxes
     eShapeNum = -1; eControlPt = 0;
-    var r = 8;
+    var r = 4;
     var found = false;
     for (var i = 0; i < stack.length && !found; i++) {
       for (var cp = 1; cp <= 2; cp++) {

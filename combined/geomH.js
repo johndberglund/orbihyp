@@ -21,7 +21,7 @@ var lastGoodHomeMat = [[1,0,0],[0,1,0],[0,0,1]];
 var tempMat         = [[1,0,0],[0,1,0],[0,0,1]];
 var posA3d = 0, posB3d = 0;
 var posA   = 0, posB   = 0;   // screen coords (or 0 when not drawing)
-var shapeNum = -1, controlPt = 1, editBoxSize = 8;
+var shapeNum = -1, controlPt = 1, editBoxSize = 4;
 var homeFDIdx  = 0;
 var panBestI = 0, panBestJ = 1, panDet = 1;
 var homeMatAtPress;
@@ -37,6 +37,7 @@ var indexedCents, uniqGens, coords2Drop, townMaps;
 var params, atomPtList, modelFD, modelFDCent, recenterMat, paramPtList;
 var fdArea, allGenMats, allMappedCents, genMats, townCents, townMats;
 var yardFD, yardFDCent;
+var lastClickLocalPt = null;
 var specialPts = [], reflEdges = [];
 var maxT;
 
@@ -986,14 +987,51 @@ function nGonVerts(C, V, n) {
 
 // ── Base FD alignment & snap ──────────────────────────────────────────────────
 
+// Hybrid tile locator: coarse townCents search + fine yard check.
+// sceneP: point in scene space.
+// Returns { idx, localPt } — townMats[idx] is the containing tile,
+// localPt is sceneP mapped back into modelFD space.
+// Hybrid tile locator: coarse townCents search + fine yard check.
+// sceneP: point in scene space.
+// Returns { idx, localPt } — townMats[idx] is the containing tile,
+// localPt is sceneP mapped back into modelFD space.
+function findTile(sceneP) {
+  let p = sceneP, idx = 0;
+  for (let guard = 0; guard < 20; guard++) {
+    // Coarse: closest townCent in scene space
+    let bestI = 0, bestD = hDist(p, townCents[0]);
+    for (let i = 1; i < townCents.length; i++) {
+      let d = hDist(p, townCents[i]);
+      if (d < bestD) { bestD = d; bestI = i; }
+    }
+    // idx is always the first-pass result — the tile actually containing sceneP.
+    // Later passes only refine localPt by composing more inverse maps.
+    if (guard === 0) idx = bestI;
+    // Map p back toward modelFD
+    let localP = multMatVect(invMat(townMats[bestI]), p);
+    // Fine: check whether any yardFDCent is closer than modelFDCent
+    let fineD = hDist(localP, modelFDCent), fineK = -1;
+    for (let k = 0; k < yardFDCent.length; k++) {
+      let d = hDist(localP, yardFDCent[k]);
+      if (d < fineD) { fineD = d; fineK = k; }
+    }
+    if (fineK === -1) return { idx, localPt: localP };
+    // A yard tile is closer — repeat with the inverse-mapped point to refine localPt
+    p = localP;
+  }
+  // Safety fallback (should not be reached in practice)
+  return { idx, localPt: p };
+}
+
 function updateHomeFD() {
   if (!townCents || townCents.length === 0) { homeFDIdx = 0; return; }
-  let minT = Infinity, bestIdx = 0;
-  for (let i = 0; i < townCents.length; i++) {
-    let t = multMatVect(homeMat, townCents[i])[0];
-    if (t < minT) { minT = t; bestIdx = i; }
+  let viewCenter = multMatVect(getInvHome(), [1, 0, 0]);
+  let bestI = 0, bestD = hDist(viewCenter, townCents[0]);
+  for (let i = 1; i < townCents.length; i++) {
+    let d = hDist(viewCenter, townCents[i]);
+    if (d < bestD) { bestD = d; bestI = i; }
   }
-  homeFDIdx = bestIdx;
+  homeFDIdx = bestI;
 }
 
 function toPoincareFDRep(P) {
@@ -1060,21 +1098,38 @@ function getSnappedPoint(P, screenPos) {
 }
 
 function alignHomeFD(updateDragState) {
-  let viewCenterScene = hNorm(multMatVect(invMat(homeMat), [1,0,0]));
-  let bestMat = identity, bestCent = modelFDCent, improved = true;
-  while (improved) {
-    improved = false;
-    for (let k = 0; k < genMats.length; k++) {
-      let tryMat = multMatMat(genMats[k], bestMat);
-      let tryCent = multMatVect(tryMat, modelFDCent);
-      if (hDist(tryCent, viewCenterScene) < hDist(bestCent, viewCenterScene) - 1e-6) {
-        bestMat = tryMat; bestCent = tryCent; improved = true; break;
+  if (!townCents || townCents.length === 0) return false;
+
+  // Coarse: find townCent closest to view center in scene space
+  let sceneP = multMatVect(getInvHome(), [1, 0, 0]);
+  let bestI = 0, bestD = hDist(sceneP, townCents[0]);
+  for (let i = 1; i < townCents.length; i++) {
+    let d = hDist(sceneP, townCents[i]);
+    if (d < bestD) { bestD = d; bestI = i; }
+  }
+  let mat = townMats[bestI];
+
+  // Fine: greedy walk on localP in scene space to handle residual outside townMats coverage.
+  // We walk the POINT (not homeMat), so no drift accumulates. Each step strictly
+  // reduces hDist(localP, modelFDCent) so this always terminates.
+  let localP = multMatVect(invMat(mat), sceneP);
+  let walking = true;
+  while (walking) {
+    let d = hDist(localP, modelFDCent);
+    walking = false;
+    for (let k = 0; k < yardFDCent.length; k++) {
+      if (hDist(localP, yardFDCent[k]) < d - 1e-6) {
+        mat    = multMatMat(mat, genMats[k]);
+        localP = multMatVect(invMat(genMats[k]), localP);
+        walking = true;
+        break;
       }
     }
   }
-  if (hDist(bestCent, viewCenterScene) >= hDist(modelFDCent, viewCenterScene) - 1e-6) return false;
-  let candidateMat = multMatMat(homeMat, bestMat);
-  let alignDet = matDet(candidateMat) < 0 ? -1 : 1;
+
+  // Re-derive homeMat cleanly: candidateMat positions the correct tile in view space,
+  // then hIsomSeg2Seg eliminates any accumulated numerical drift in homeMat.
+  let candidateMat = multMatMat(homeMat, mat);
   let newScr = modelFD.map(p => pt2Screen(multMatVect(candidateMat, p), hZoom));
   let bI = 0, bJ = 1, pbd = -1;
   for (let i = 0; i < newScr.length; i++)
@@ -1083,16 +1138,34 @@ function alignHomeFD(updateDragState) {
       let d = dx*dx+dy*dy;
       if (d > pbd) { pbd = d; bI = i; bJ = j; }
     }
+  // V0: first anchor, accepted as-is.
+  // V1: project the raw second anchor onto the geodesic ray from V0 at exactly
+  //     the true distance, so hIsomSeg2Seg's distance check always passes.
   let V0 = hNorm(multMatVect(candidateMat, modelFD[bI]));
-  let V1 = hNorm(multMatVect(candidateMat, modelFD[bJ]));
+  let V1_raw = hNorm(multMatVect(candidateMat, modelFD[bJ]));
+  let d_true = hDist(modelFD[bI], modelFD[bJ]);
+  let d_raw  = hDist(V0, V1_raw);
+  let V1;
+  if (d_raw > epsilon) {
+    let tang = scalarVect(1 / Math.sinh(d_raw), vectDiff(V1_raw, scalarVect(Math.cosh(d_raw), V0)));
+    V1 = vectSum(scalarVect(Math.cosh(d_true), V0), scalarVect(Math.sinh(d_true), tang));
+  } else {
+    V1 = V1_raw;
+  }
+  let alignDet = matDet(candidateMat) < 0 ? -1 : 1;
   let newMat = alignDet < 0
     ? hIsomSeg2SegFlip(modelFD[bI], modelFD[bJ], V0, V1)
     : hIsomSeg2Seg(modelFD[bI], modelFD[bJ], V0, V1);
-  homeMat = (typeof newMat === 'string') ? candidateMat : newMat;
-  if (isFinite(homeMat[0][0]) && isFinite(homeMat[1][1]) && isFinite(homeMat[2][2]))
-    lastGoodHomeMat = homeMat.map(row => [...row]);
+  homeMat = (typeof newMat !== 'string') ? newMat : candidateMat;
+
+  if (!isFinite(homeMat[0][0]) || !isFinite(homeMat[1][1]) || !isFinite(homeMat[2][2])) {
+    homeMat = lastGoodHomeMat.map(row => [...row]);
+    return false;
+  }
+  lastGoodHomeMat = homeMat.map(row => [...row]);
   buildTownMats();
   homeFDIdx = 0;
+
   if (updateDragState) {
     tempMat = homeMat.map(row => [...row]);
     panBestI = bI; panBestJ = bJ; panDet = alignDet;
@@ -1120,6 +1193,7 @@ function hReDo() {
   buildMatch();
   buildBorderFD();
   rebuildGeom();
+
 }
 
 // ── hDraw — render hyperbolic scene ──────────────────────────────────────────
@@ -1274,6 +1348,18 @@ function hDraw(ctx, c) {
       }
     }
   }
+
+  // Debug dot: show last click inverse-mapped into homeFD
+  if (lastClickLocalPt && townMats && homeFDIdx != null) {
+    let dotView = multMatVect(homeMat, multMatVect(townMats[homeFDIdx], lastClickLocalPt));
+    let ds = pt2Screen(dotView, hZoom);
+    ctx.beginPath();
+    ctx.arc(ds[0], ds[1], 8, 0, 2 * Math.PI);
+    ctx.fillStyle = "rgba(255, 0, 0, 0.8)";
+    ctx.fill();
+    ctx.strokeStyle = "darkred"; ctx.lineWidth = 2; ctx.stroke();
+    ctx.closePath();
+  }
 }
 
 // ── H mouse handlers ───────────────────────────────────────────────────────────
@@ -1282,6 +1368,15 @@ function hDraw(ctx, c) {
 function hMousePressed(sx, sy) {
   posA   = [sx, sy];
   posA3d = screen2Pt(posA, hZoom);
+
+  // findTile debug: inverse-map click to modelFD space and log
+  if (townCents && townCents.length > 0) {
+    let sceneP = multMatVect(getInvHome(), posA3d);
+    let { idx, localPt } = findTile(sceneP);
+    lastClickLocalPt = localPt;
+    let d = hDist(localPt, modelFDCent);
+    console.log(`findTile: idx=${idx}  localPt=[${localPt.map(v=>v.toFixed(4)).join(', ')}]  hDist to modelFDCent=${d.toFixed(4)}`);
+  }
 
   if (mode === -1) {
     tempMat = homeMat.map(row => [...row]);
