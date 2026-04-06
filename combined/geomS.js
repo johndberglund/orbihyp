@@ -661,20 +661,67 @@ function sDraw(ctx, c) {
       }
     }
   }
+
+  // Red dot: show last click mapped back to home FD (front hemisphere only)
+  if (sLastClickLocalPt && sLastClickLocalPt[2] >= 0) {
+    var ds = sVect2screen(sLastClickLocalPt);
+    ctx.beginPath();
+    ctx.arc(ds[0], ds[1], 8, 0, 2 * Math.PI);
+    ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
+    ctx.fill();
+    ctx.strokeStyle = 'darkred';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
 }
 
 // ── S mouse handlers ───────────────────────────────────────────────────────────
 
 var sPanPosA = null;
+var sBackupClickLocalPt = null; // saved before pan drag for red dot
+var sLastClickLocalPt = null;   // canonical FD coords of last click (for red dot)
 var sEditShapeIdx = -1, sEditPtIdx = -1;
 var boxSize = 4;
 
 function sMousePressed(sx, sy, shiftKey) {
   var pt3 = sScreen2vect(sx, sy, shiftKey);
+
+  // Red dot: find which tile (map,i) contains the click; inverse-map to canonical FD
+  {
+    var verts = sFDVerts();
+    var cx = 0, cy = 0, cz = 0;
+    for (var vi = 0; vi < verts.length; vi++) { cx += verts[vi][0]; cy += verts[vi][1]; cz += verts[vi][2]; }
+    var cnorm = Math.sqrt(cx*cx + cy*cy + cz*cz);
+    var sFDCent = [cx/cnorm, cy/cnorm, cz/cnorm];
+    var N = sSymVects[0];
+    var symRotAng = 2 * Math.PI / sMyRot;
+    var bestDot = -2, bestLocalPt = pt3;
+    for (var map = 1; map <= sNumMaps; map++) {
+      // Build MapMat columns by applying sMapOne to standard basis
+      var e0 = sMapOne(map, 1, 0, 0);
+      var e1 = sMapOne(map, 0, 1, 0);
+      var e2 = sMapOne(map, 0, 0, 1);
+      for (var i = 0; i < sMyRot; i++) {
+        // Inverse of tile(map,i): first undo rotation, then undo map (MapMat^T = MapMat^{-1})
+        var rp = multMatVect(sRotMat(N, -symRotAng * i), pt3);
+        var localPt = [
+          e0[0]*rp[0] + e0[1]*rp[1] + e0[2]*rp[2],
+          e1[0]*rp[0] + e1[1]*rp[1] + e1[2]*rp[2],
+          e2[0]*rp[0] + e2[1]*rp[1] + e2[2]*rp[2]
+        ];
+        var d = localPt[0]*sFDCent[0] + localPt[1]*sFDCent[1] + localPt[2]*sFDCent[2];
+        if (d > bestDot) { bestDot = d; bestLocalPt = localPt; }
+      }
+    }
+    sLastClickLocalPt = bestLocalPt;
+  }
+
   if (mode === -1) {
     sPanPosA = [sx, sy, shiftKey];
-    sBackupStack    = stack.map(function(s){ return [s[0], s[1].slice(), s[2].slice(), s[3], s[4]]; });
-    sBackupSymVects = sSymVects.map(function(v){ return v.slice(); });
+    sBackupStack       = stack.map(function(s){ return [s[0], s[1].slice(), s[2].slice(), s[3], s[4]]; });
+    sBackupSymVects    = sSymVects.map(function(v){ return v.slice(); });
+    sBackupClickLocalPt = sLastClickLocalPt ? sLastClickLocalPt.slice() : null;
+    draw();
     return;
   }
   if (mode === 0) {
@@ -685,6 +732,7 @@ function sMousePressed(sx, sy, shiftKey) {
       if (Math.abs(sx-sp[0]) < boxSize && Math.abs(sy-sp[1]) < boxSize) { sEditShapeIdx = i; sEditPtIdx = 1; break; }
       if (Math.abs(sx-sq[0]) < boxSize && Math.abs(sy-sq[1]) < boxSize) { sEditShapeIdx = i; sEditPtIdx = 2; break; }
     }
+    draw();
     return;
   }
   sPosA3d = pt3; sPosB3d = pt3;
@@ -703,6 +751,7 @@ function sMouseMoved(sx, sy, shiftKey) {
       return [elem[0], multMatVect(myMatrix, elem[1]), multMatVect(myMatrix, elem[2]), elem[3], elem[4]];
     });
     sSymVects = sBackupSymVects.map(function(v){ return multMatVect(myMatrix, v); });
+    sLastClickLocalPt = sBackupClickLocalPt ? multMatVect(myMatrix, sBackupClickLocalPt) : null;
     draw();
     return;
   }

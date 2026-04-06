@@ -21,6 +21,7 @@ var ePosA = null, ePosB = null;  // line drawing: start/end screen coords [sx,sy
 var _ePanStart  = null;          // pan drag: start screen pos
 var _ePanModel = null;          // pan drag: [eTransX,eTransY] at press
 var eTownMats = null;        // BFS tile matrices (canonical space)
+var eLastClickLocalPt = null; // canonical FD coords of last click (for red dot)
 
 // ── E coordinate conversion ───────────────────────────────────────────────────
 // Accepts [x,y] or [x,y,1] — only first two components used.
@@ -38,6 +39,16 @@ function eInvSimilarity(M) {
   var s2 = a*a + b*b;
   return [[ a/s2,  b/s2, -(a*tx + b*ty)/s2],
           [-b/s2,  a/s2,  (b*tx - a*ty)/s2],
+          [0, 0, 1]];
+}
+
+// Inverse of any 2D isometry (works for both direct and indirect).
+// The linear part is orthogonal, so its inverse is its transpose.
+function eInvIsom(M) {
+  var m00=M[0][0], m01=M[0][1], tx=M[0][2];
+  var m10=M[1][0], m11=M[1][1], ty=M[1][2];
+  return [[m00, m10, -(m00*tx + m10*ty)],
+          [m01, m11, -(m01*tx + m11*ty)],
           [0, 0, 1]];
 }
 
@@ -431,6 +442,19 @@ function eDraw(ctx, c) {
       }
     }
   }
+
+  // Red dot: show last click mapped back to home FD
+  if (eLastClickLocalPt) {
+    var worldPt = multMatVect(eHomeMat, [eLastClickLocalPt[0], eLastClickLocalPt[1], 1]);
+    var ds = eVect2Screen(worldPt);
+    ctx.beginPath();
+    ctx.arc(ds[0], ds[1], 8, 0, 2 * Math.PI);
+    ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
+    ctx.fill();
+    ctx.strokeStyle = 'darkred';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
 }
 
 // ── Mouse handlers ────────────────────────────────────────────────────────────
@@ -446,6 +470,24 @@ function _eDistSq(sx, sy, wv) {
 
 function eMousePressed(sx, sy) {
   var fd = eGetShapeFD();
+
+  // Red dot: greedy-walk click back to canonical FD space
+  if (eGenMats && eGenMats.length > 0) {
+    var p = multMatVect(eInvSimilarity(eHomeMat), eScreen2Vect(sx, sy));
+    var walking = true;
+    while (walking) {
+      var ddx = p[0]-modelFDCent[0], ddy = p[1]-modelFDCent[1];
+      var d2 = ddx*ddx + ddy*ddy;
+      walking = false;
+      for (var k = 0; k < eGenMats.length; k++) {
+        var q = multMatVect(eInvIsom(eGenMats[k]), p);
+        var qx = q[0]-modelFDCent[0], qy = q[1]-modelFDCent[1];
+        if (qx*qx + qy*qy < d2 - 1e-9) { p = q; walking = true; break; }
+      }
+    }
+    eLastClickLocalPt = [p[0], p[1]];
+    draw();
+  }
 
   if (mode === -1) {
     // Pan: record start
