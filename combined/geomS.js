@@ -683,43 +683,123 @@ var sLastClickLocalPt = null;   // canonical FD coords of last click (for red do
 var sEditShapeIdx = -1, sEditPtIdx = -1;
 var boxSize = 4;
 
+// Groups with pure reflection lines (indexed by sOrbi 0-13)
+var sHasRefl = [true,false,true,false,true,true,false,true,true,false,true,false,true,false];
+
+function sCanonicalPt(pt3) {
+  var verts = sFDVerts();
+  var cx=0, cy=0, cz=0;
+  for (var vi=0; vi<verts.length; vi++) { cx+=verts[vi][0]; cy+=verts[vi][1]; cz+=verts[vi][2]; }
+  var cn = Math.sqrt(cx*cx+cy*cy+cz*cz);
+  var sFDCent = [cx/cn, cy/cn, cz/cn];
+  var N = sSymVects[0];
+  var symRotAng = 2*Math.PI/sMyRot;
+  var bestDot = -2, bestLocalPt = pt3;
+  for (var map=1; map<=sNumMaps; map++) {
+    var e0=sMapOne(map,1,0,0), e1=sMapOne(map,0,1,0), e2=sMapOne(map,0,0,1);
+    for (var i=0; i<sMyRot; i++) {
+      var rp = multMatVect(sRotMat(N, -symRotAng*i), pt3);
+      var lp = [e0[0]*rp[0]+e0[1]*rp[1]+e0[2]*rp[2],
+                e1[0]*rp[0]+e1[1]*rp[1]+e1[2]*rp[2],
+                e2[0]*rp[0]+e2[1]*rp[1]+e2[2]*rp[2]];
+      var d = lp[0]*sFDCent[0]+lp[1]*sFDCent[1]+lp[2]*sFDCent[2];
+      if (d > bestDot) { bestDot=d; bestLocalPt=lp; }
+    }
+  }
+  return bestLocalPt;
+}
+
+function sFootOnArc(P, A, B) {
+  var nx=A[1]*B[2]-A[2]*B[1], ny=A[2]*B[0]-A[0]*B[2], nz=A[0]*B[1]-A[1]*B[0];
+  var nLen = Math.sqrt(nx*nx+ny*ny+nz*nz);
+  if (nLen < 1e-10) return [A[0],A[1],A[2]];
+  nx/=nLen; ny/=nLen; nz/=nLen;
+  var dp = nx*P[0]+ny*P[1]+nz*P[2];
+  var fx=P[0]-dp*nx, fy=P[1]-dp*ny, fz=P[2]-dp*nz;
+  var fLen = Math.sqrt(fx*fx+fy*fy+fz*fz);
+  if (fLen < 1e-10) return [A[0],A[1],A[2]];
+  var foot = [fx/fLen, fy/fLen, fz/fLen];
+  // check foot lies on the minor arc A→B
+  var abx=A[1]*B[2]-A[2]*B[1], aby=A[2]*B[0]-A[0]*B[2], abz=A[0]*B[1]-A[1]*B[0];
+  var afx=A[1]*foot[2]-A[2]*foot[1], afy=A[2]*foot[0]-A[0]*foot[2], afz=A[0]*foot[1]-A[1]*foot[0];
+  var fbx=foot[1]*B[2]-foot[2]*B[1], fby=foot[2]*B[0]-foot[0]*B[2], fbz=foot[0]*B[1]-foot[1]*B[0];
+  var saf=abx*afx+aby*afy+abz*afz, sfb=abx*fbx+aby*fby+abz*fbz;
+  if (saf >= -1e-9 && sfb >= -1e-9) return foot;
+  var dA=Math.acos(Math.min(1,Math.max(-1,P[0]*A[0]+P[1]*A[1]+P[2]*A[2])));
+  var dB=Math.acos(Math.min(1,Math.max(-1,P[0]*B[0]+P[1]*B[1]+P[2]*B[2])));
+  return dA <= dB ? [A[0],A[1],A[2]] : [B[0],B[1],B[2]];
+}
+
+function sSnapFDPt(localPt, pt3) {
+  if (!snapMode) return localPt;
+  var THRESH = 10;
+  var bestD = THRESH, best = null;
+  var verts = sFDVerts();
+  var N = sSymVects[0];
+  var symRotAng = 2*Math.PI/sMyRot;
+  var scrClick = sVect2screen(pt3);
+
+  // Check FD vertices across all tile copies
+  for (var map=1; map<=sNumMaps; map++) {
+    var e0=sMapOne(map,1,0,0), e1=sMapOne(map,0,1,0), e2=sMapOne(map,0,0,1);
+    for (var i=0; i<sMyRot; i++) {
+      var rotMat = sRotMat(N, symRotAng*i);
+      for (var vi=0; vi<verts.length; vi++) {
+        var v=verts[vi];
+        var mv=[e0[0]*v[0]+e1[0]*v[1]+e2[0]*v[2],
+                e0[1]*v[0]+e1[1]*v[1]+e2[1]*v[2],
+                e0[2]*v[0]+e1[2]*v[1]+e2[2]*v[2]];
+        var tiled=multMatVect(rotMat, mv);
+        if (tiled[2] < 0) continue;
+        var sc=sVect2screen(tiled);
+        var d=Math.hypot(sc[0]-scrClick[0], sc[1]-scrClick[1]);
+        if (d < bestD) { bestD=d; best=verts[vi]; }
+      }
+    }
+  }
+  if (best) return best;
+
+  // Check FD edges (only for groups with reflection lines)
+  if (sOrbi < sHasRefl.length && sHasRefl[sOrbi]) {
+    for (var map=1; map<=sNumMaps; map++) {
+      var e0=sMapOne(map,1,0,0), e1=sMapOne(map,0,1,0), e2=sMapOne(map,0,0,1);
+      for (var i=0; i<sMyRot; i++) {
+        var rotMat=sRotMat(N, symRotAng*i);
+        for (var j=0; j<verts.length; j++) {
+          var A=verts[j], B=verts[(j+1)%verts.length];
+          var mA=[e0[0]*A[0]+e1[0]*A[1]+e2[0]*A[2], e0[1]*A[0]+e1[1]*A[1]+e2[1]*A[2], e0[2]*A[0]+e1[2]*A[1]+e2[2]*A[2]];
+          var mB=[e0[0]*B[0]+e1[0]*B[1]+e2[0]*B[2], e0[1]*B[0]+e1[1]*B[1]+e2[1]*B[2], e0[2]*B[0]+e1[2]*B[1]+e2[2]*B[2]];
+          var tA=multMatVect(rotMat, mA), tB=multMatVect(rotMat, mB);
+          var tiledFoot=sFootOnArc(pt3, tA, tB);
+          if (tiledFoot[2] < 0) continue;
+          var sc=sVect2screen(tiledFoot);
+          var d=Math.hypot(sc[0]-scrClick[0], sc[1]-scrClick[1]);
+          if (d < bestD) {
+            var invRot=multMatVect(sRotMat(N, -symRotAng*i), tiledFoot);
+            var cf=[e0[0]*invRot[0]+e0[1]*invRot[1]+e0[2]*invRot[2],
+                   e1[0]*invRot[0]+e1[1]*invRot[1]+e1[2]*invRot[2],
+                   e2[0]*invRot[0]+e2[1]*invRot[1]+e2[2]*invRot[2]];
+            var cn=Math.sqrt(cf[0]*cf[0]+cf[1]*cf[1]+cf[2]*cf[2]);
+            if (cn > 1e-10) { cf[0]/=cn; cf[1]/=cn; cf[2]/=cn; }
+            bestD=d; best=cf;
+          }
+        }
+      }
+    }
+  }
+  return best || localPt;
+}
+
 function sMousePressed(sx, sy, shiftKey) {
   var pt3 = sScreen2vect(sx, sy, shiftKey);
 
-  // Red dot: find which tile (map,i) contains the click; inverse-map to canonical FD
-  {
-    var verts = sFDVerts();
-    var cx = 0, cy = 0, cz = 0;
-    for (var vi = 0; vi < verts.length; vi++) { cx += verts[vi][0]; cy += verts[vi][1]; cz += verts[vi][2]; }
-    var cnorm = Math.sqrt(cx*cx + cy*cy + cz*cz);
-    var sFDCent = [cx/cnorm, cy/cnorm, cz/cnorm];
-    var N = sSymVects[0];
-    var symRotAng = 2 * Math.PI / sMyRot;
-    var bestDot = -2, bestLocalPt = pt3;
-    for (var map = 1; map <= sNumMaps; map++) {
-      // Build MapMat columns by applying sMapOne to standard basis
-      var e0 = sMapOne(map, 1, 0, 0);
-      var e1 = sMapOne(map, 0, 1, 0);
-      var e2 = sMapOne(map, 0, 0, 1);
-      for (var i = 0; i < sMyRot; i++) {
-        // Inverse of tile(map,i): first undo rotation, then undo map (MapMat^T = MapMat^{-1})
-        var rp = multMatVect(sRotMat(N, -symRotAng * i), pt3);
-        var localPt = [
-          e0[0]*rp[0] + e0[1]*rp[1] + e0[2]*rp[2],
-          e1[0]*rp[0] + e1[1]*rp[1] + e1[2]*rp[2],
-          e2[0]*rp[0] + e2[1]*rp[1] + e2[2]*rp[2]
-        ];
-        var d = localPt[0]*sFDCent[0] + localPt[1]*sFDCent[1] + localPt[2]*sFDCent[2];
-        if (d > bestDot) { bestDot = d; bestLocalPt = localPt; }
-      }
-    }
-    sLastClickLocalPt = bestLocalPt;
-  }
+  // Red dot: map click back to canonical FD
+  sLastClickLocalPt = sCanonicalPt(pt3);
 
   if (mode === -1) {
     sPanPosA = [sx, sy, shiftKey];
-    sBackupStack       = stack.map(function(s){ return [s[0], s[1].slice(), s[2].slice(), s[3], s[4]]; });
-    sBackupSymVects    = sSymVects.map(function(v){ return v.slice(); });
+    sBackupStack        = stack.map(function(s){ return [s[0], s[1].slice(), s[2].slice(), s[3], s[4]]; });
+    sBackupSymVects     = sSymVects.map(function(v){ return v.slice(); });
     sBackupClickLocalPt = sLastClickLocalPt ? sLastClickLocalPt.slice() : null;
     draw();
     return;
@@ -735,7 +815,8 @@ function sMousePressed(sx, sy, shiftKey) {
     draw();
     return;
   }
-  sPosA3d = pt3; sPosB3d = pt3;
+  sPosA3d = pt3;
+  sPosB3d = sPosA3d;
   draw();
 }
 
@@ -756,12 +837,12 @@ function sMouseMoved(sx, sy, shiftKey) {
     return;
   }
   if (mode === 0 && sEditShapeIdx >= 0) {
-    stack[sEditShapeIdx][sEditPtIdx] = pt3;
+    stack[sEditShapeIdx][sEditPtIdx] = snapMode ? sSnapFDPt(sCanonicalPt(pt3), pt3) : pt3;
     draw();
     return;
   }
   if (sPosA3d.length > 0) {
-    sPosB3d = pt3;
+    sPosB3d = snapMode ? sSnapFDPt(sCanonicalPt(pt3), pt3) : pt3;
     draw();
   }
 }
@@ -771,7 +852,8 @@ function sMouseReleased(sx, sy, shiftKey) {
   if (mode === -1) { sPanPosA = null; return; }
   if (mode === 0)  { sEditShapeIdx = -1; draw(); return; }
   if (sPosA3d.length > 0) {
-    sPosB3d = pt3;
+    var relLocalPt = sCanonicalPt(pt3);
+    sPosB3d = snapMode ? sSnapFDPt(relLocalPt, pt3) : pt3;
     undoStack = [];
     stack.push([mode, sPosA3d.slice(), sPosB3d.slice(), color, fill]);
     sPosA3d = []; sPosB3d = [];

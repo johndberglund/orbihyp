@@ -55,11 +55,98 @@ function eInvIsom(M) {
 // Return the current working shape (falls back to modelFD if not yet set).
 function eGetShapeFD() { return eShapeFD || modelFD; }
 
+var eSpecialPts = [], eReflEdges = [];
+
+function eFootOnSeg(P, A, B) {
+  var dx = B[0]-A[0], dy = B[1]-A[1];
+  var len2 = dx*dx + dy*dy;
+  if (len2 < 1e-12) return [A[0], A[1]];
+  var t = ((P[0]-A[0])*dx + (P[1]-A[1])*dy) / len2;
+  t = Math.max(0, Math.min(1, t));
+  return [A[0]+t*dx, A[1]+t*dy];
+}
+
+function eBuildSpecialPts() {
+  eSpecialPts = []; eReflEdges = [];
+  var n = modelFD.length;
+  for (var i = 0; i < n; i++) {
+    var gm = eGenMaps[i];
+    if (gm[1] === 0 && gm[0] === i) {
+      eReflEdges.push([modelFD[i], modelFD[(i+1)%n]]);
+    }
+    var prev = (i-1+n)%n;
+    var gp = eGenMaps[prev], gi = eGenMaps[i];
+    if (gp[1] === 0 || gi[1] === 0) {
+      eSpecialPts.push(modelFD[i]);
+    } else if (gp[0] === i && gi[0] === prev) {
+      eSpecialPts.push(modelFD[i]);
+    }
+  }
+}
+
+function eCanonicalPt(sx, sy) {
+  var p = multMatVect(eInvSimilarity(eHomeMat), eScreen2Vect(sx, sy));
+  if (!eGenMats || eGenMats.length === 0) return [p[0], p[1]];
+  var walking = true;
+  while (walking) {
+    var ddx = p[0]-modelFDCent[0], ddy = p[1]-modelFDCent[1];
+    var d2 = ddx*ddx + ddy*ddy;
+    walking = false;
+    for (var k = 0; k < eGenMats.length; k++) {
+      var q = multMatVect(eInvIsom(eGenMats[k]), p);
+      var qx = q[0]-modelFDCent[0], qy = q[1]-modelFDCent[1];
+      if (qx*qx + qy*qy < d2 - 1e-9) { p = q; walking = true; break; }
+    }
+  }
+  return [p[0], p[1]];
+}
+
+function eSnapFDPt(localPt, sx, sy) {
+  if (!snapMode) return localPt;
+  var THRESH = 10;
+  var bestD = THRESH, best = null;
+  var tiles = eTownMats || [[[1,0,0],[0,1,0],[0,0,1]]];
+  var invH = eInvSimilarity(eHomeMat);
+
+  // Check special points across all tile copies
+  for (var k = 0; k < tiles.length; k++) {
+    var TM = multMatMat(eHomeMat, tiles[k]);
+    for (var i = 0; i < eSpecialPts.length; i++) {
+      var sp = eSpecialPts[i];
+      var sc = eVect2Screen(multMatVect(TM, [sp[0], sp[1], 1]));
+      var d = Math.hypot(sc[0]-sx, sc[1]-sy);
+      if (d < bestD) { bestD = d; best = sp; }
+    }
+  }
+  if (best) return best;
+
+  // Check reflection edges across all tile copies
+  var W = eScreen2Vect(sx, sy);
+  for (var k = 0; k < tiles.length; k++) {
+    var TM = multMatMat(eHomeMat, tiles[k]);
+    var invTk = eInvIsom(tiles[k]);
+    for (var j = 0; j < eReflEdges.length; j++) {
+      var A = eReflEdges[j][0], B = eReflEdges[j][1];
+      var wA = multMatVect(TM, [A[0], A[1], 1]);
+      var wB = multMatVect(TM, [B[0], B[1], 1]);
+      var wFoot = eFootOnSeg(W, wA, wB);
+      var sc = eVect2Screen(wFoot);
+      var d = Math.hypot(sc[0]-sx, sc[1]-sy);
+      if (d < bestD) {
+        var cf = multMatVect(invTk, multMatVect(invH, [wFoot[0], wFoot[1], 1]));
+        bestD = d; best = [cf[0], cf[1]];
+      }
+    }
+  }
+  return best || localPt;
+}
+
 // ── eSetGroup ─────────────────────────────────────────────────────────────────
 function eSetGroup(idx) {
   eOrbi = idx;
   eBuildModelFD();
   eBuildGenMats();
+  eBuildSpecialPts();
 }
 
 // ── eBuildModelFD ────────────────────────────────────────────────────────────
@@ -395,6 +482,9 @@ function eDraw(ctx, c) {
     var invM = eInvSimilarity(eHomeMat);
     var P = multMatVect(invM, eScreen2Vect(ePosA[0], ePosA[1]));
     var Q = multMatVect(invM, eScreen2Vect(ePosB[0], ePosB[1]));
+    if (snapMode) {
+      Q = eSnapFDPt(eCanonicalPt(ePosB[0], ePosB[1]), ePosB[0], ePosB[1]);
+    }
     var preview = [mode === 1 ? 1 : mode, P, Q, color, fill];
     ctx.strokeStyle = color;
     ctx.lineWidth   = 1.5;
@@ -471,23 +561,9 @@ function _eDistSq(sx, sy, wv) {
 function eMousePressed(sx, sy) {
   var fd = eGetShapeFD();
 
-  // Red dot: greedy-walk click back to canonical FD space
-  if (eGenMats && eGenMats.length > 0) {
-    var p = multMatVect(eInvSimilarity(eHomeMat), eScreen2Vect(sx, sy));
-    var walking = true;
-    while (walking) {
-      var ddx = p[0]-modelFDCent[0], ddy = p[1]-modelFDCent[1];
-      var d2 = ddx*ddx + ddy*ddy;
-      walking = false;
-      for (var k = 0; k < eGenMats.length; k++) {
-        var q = multMatVect(eInvIsom(eGenMats[k]), p);
-        var qx = q[0]-modelFDCent[0], qy = q[1]-modelFDCent[1];
-        if (qx*qx + qy*qy < d2 - 1e-9) { p = q; walking = true; break; }
-      }
-    }
-    eLastClickLocalPt = [p[0], p[1]];
-    draw();
-  }
+  // Red dot: map click back to canonical FD space
+  eLastClickLocalPt = eCanonicalPt(sx, sy);
+  draw();
 
   if (mode === -1) {
     // Pan: record start
@@ -540,8 +616,13 @@ function eMouseMoved(sx, sy) {
 
   // ── Edit-mode control-point drag ─────────────────────────────────────────
   if (mode === 0 && eShapeNum >= 0) {
-    var invM = eInvSimilarity(eHomeMat);
-    var pC   = multMatVect(invM, eScreen2Vect(sx, sy));
+    var pC;
+    if (snapMode) {
+      pC = eSnapFDPt(eCanonicalPt(sx, sy), sx, sy);
+    } else {
+      var raw = multMatVect(eInvSimilarity(eHomeMat), eScreen2Vect(sx, sy));
+      pC = [raw[0], raw[1]];
+    }
     stack[eShapeNum][eControlPt] = [pC[0], pC[1]];
     draw();
     return;
@@ -603,8 +684,15 @@ function eMouseReleased(sx, sy) {
   // Commit line/polygon to stack
   if (ePosA !== null && ePosB !== null && mode >= 1) {
     var invM = eInvSimilarity(eHomeMat);
-    var P    = multMatVect(invM, eScreen2Vect(ePosA[0], ePosA[1]));
-    var Q    = multMatVect(invM, eScreen2Vect(ePosB[0], ePosB[1]));
+    var rP = multMatVect(invM, eScreen2Vect(ePosA[0], ePosA[1]));
+    var P = [rP[0], rP[1]];
+    var Q;
+    if (snapMode) {
+      Q = eSnapFDPt(eCanonicalPt(ePosB[0], ePosB[1]), ePosB[0], ePosB[1]);
+    } else {
+      var rQ = multMatVect(invM, eScreen2Vect(ePosB[0], ePosB[1]));
+      Q = [rQ[0], rQ[1]];
+    }
     stack.push([mode === 1 ? 1 : mode,
                 [P[0], P[1]], [Q[0], Q[1]],
                 color,

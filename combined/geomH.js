@@ -4,14 +4,7 @@
 
 // ── Constants & math helpers ──────────────────────────────────────────────────
 
-var epsilon  = 0.0000001;
 var identity = [[1,0,0],[0,1,0],[0,0,1]];
-
-// ── Shared display state (also used by geomES.js for S) ───────────────────────
-// Set by main.js init() and resize().
-var scrRadius  = 200;
-var scrCenterX = 400;
-var scrCenterY = 300;
 
 // ── H view state ──────────────────────────────────────────────────────────────
 
@@ -21,7 +14,7 @@ var lastGoodHomeMat = [[1,0,0],[0,1,0],[0,0,1]];
 var tempMat         = [[1,0,0],[0,1,0],[0,0,1]];
 var posA3d = 0, posB3d = 0;
 var posA   = 0, posB   = 0;   // screen coords (or 0 when not drawing)
-var shapeNum = -1, controlPt = 1, editBoxSize = 4;
+var shapeNum = -1, controlPt = 1;
 var homeFDIdx  = 0;
 var panBestI = 0, panBestJ = 1, panDet = 1;
 var homeMatAtPress;
@@ -1073,28 +1066,26 @@ function buildSpecialPts() {
   }
 }
 
-function getSnappedPoint(P, screenPos) {
-  let rep = toPoincareFDRep(P), path = rep.path;
-  function fromPFD(Q) {
-    let q = Q;
-    for (let i = path.length - 1; i >= 0; i--) q = multMatVect(genMats[path[i]], q);
-    return q;
-  }
-  let bestDist = 4, snapped = null;  // 4px threshold
+function getSnappedPoint(P) {
+  if (!snapMode) return P;
+  let res = findTile(P);
+  let idx = res.idx, localPt = res.localPt;
+  let localScr = dispPt(localPt);
+  let THRESH = 10, bestD = THRESH, best = null;
   for (let sp of specialPts) {
-    let tpt = fromPFD(sp.pt), sc = dispPt(tpt);
-    let d = Math.hypot(sc[0] - screenPos[0], sc[1] - screenPos[1]);
-    if (d < bestDist) { bestDist = d; snapped = tpt; }
+    let sc = dispPt(sp.pt);
+    let d = Math.hypot(sc[0]-localScr[0], sc[1]-localScr[1]);
+    if (d < bestD) { bestD = d; best = sp.pt; }
   }
-  if (snapped) return snapped;
+  if (best) return multMatVect(townMats[idx], best);
   for (let [A, B] of reflEdges) {
-    let sA = fromPFD(A), sB = fromPFD(B);
-    let foot = hFootOfPerp(P, hPoints2Line(sA, sB));
-    let sc = dispPt(foot);
-    let d = Math.hypot(sc[0] - screenPos[0], sc[1] - screenPos[1]);
-    if (d < bestDist) { bestDist = d; snapped = foot; }
+    if (A[0] >= 1000 || B[0] >= 1000) continue;
+    let foot = hFootOfPerp(localPt, hPoints2Line(A, B));
+    let fc = dispPt(foot);
+    let d = Math.hypot(fc[0]-localScr[0], fc[1]-localScr[1]);
+    if (d < bestD) { bestD = d; best = foot; }
   }
-  return snapped || P;
+  return best ? multMatVect(townMats[idx], best) : P;
 }
 
 function alignHomeFD(updateDragState) {
@@ -1267,10 +1258,10 @@ function hDraw(ctx, c) {
       if (stepEdges[j] === 3 || stepEdges[j] === 8) {
         let t = Math.max(0, Math.min(1, twist));
         let twistPt = hNorm(vectSum(scalarVect(1 - t, P), scalarVect(t, Q)));
-        let s = dispPt(twistPt), r = 6;
+        let s = dispPt(twistPt);
         ctx.beginPath();
-        ctx.moveTo(s[0], s[1] - r); ctx.lineTo(s[0] + r, s[1]);
-        ctx.lineTo(s[0], s[1] + r); ctx.lineTo(s[0] - r, s[1]);
+        ctx.moveTo(s[0], s[1] - editBoxSize); ctx.lineTo(s[0] + editBoxSize, s[1]);
+        ctx.lineTo(s[0], s[1] + editBoxSize); ctx.lineTo(s[0] - editBoxSize, s[1]);
         ctx.closePath();
         ctx.fillStyle = (paramNum === j && paramEnd === -1) ? "yellow" : "orange";
         ctx.fill();
@@ -1311,6 +1302,9 @@ function hDraw(ctx, c) {
     let inv = getInvHome();
     let P = multMatVect(inv, posA3d);
     let Q = multMatVect(inv, posB3d);
+    if (snapMode) {
+      Q = getSnappedPoint(Q);
+    }
     ctx.strokeStyle = color; ctx.lineWidth = 1.5;
     for (let t = 0; t < townMats.length; t++) {
       let M = townMats[t];
@@ -1336,12 +1330,11 @@ function hDraw(ctx, c) {
 
   // Edit-mode control point markers
   if (mode === 0) {
-    let r = 8;
     for (let s = 0; s < stack.length; s++) {
       for (let cp = 1; cp <= 2; cp++) {
         let sc = dispPt(stack[s][cp]);
         ctx.beginPath();
-        ctx.rect(sc[0] - r, sc[1] - r, r*2, r*2);
+        ctx.rect(sc[0] - editBoxSize, sc[1] - editBoxSize, editBoxSize*2, editBoxSize*2);
         ctx.fillStyle = (s === shapeNum && cp === controlPt) ? "yellow" : "white";
         ctx.fill();
         ctx.strokeStyle = "black"; ctx.lineWidth = 1; ctx.stroke();
@@ -1517,7 +1510,7 @@ function hMouseMoved(sx, sy) {
 
   if (mode === 0 && shapeNum >= 0) {
     let sceneP = multMatVect(invMat(homeMat), posB3d);
-    if (snapMode) sceneP = getSnappedPoint(sceneP, posB);
+    if (snapMode) sceneP = getSnappedPoint(sceneP);
     stack[shapeNum][controlPt] = sceneP;
     return;
   }
@@ -1559,8 +1552,7 @@ function hMouseReleased(sx, sy) {
     let P = multMatVect(inv, posA3d);
     let Q = multMatVect(inv, posB3d);
     if (snapMode) {
-      P = getSnappedPoint(P, posA);
-      Q = getSnappedPoint(Q, posB);
+      Q = getSnappedPoint(Q);
     }
     undoStack = [];
     stack.push([mode === 1 ? 1 : mode, P, Q, color, mode === 1 ? 0 : fill]);

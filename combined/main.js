@@ -1,10 +1,10 @@
 // main.js — Combined orbifold app: UI handlers, mouse events, draw dispatcher.
 // Depends on geomH.js (loaded first, defines scrRadius/scrCenterX/scrCenterY)
-// and geomES.js (E and S geometry).
+// and geomE.js and geomS.js (E and S geometry).
 
 // ── Shared state ─────────────────────────────────────────────────────────────
 // NOTE: stack, undoStack are used by all three geometries.
-// scrRadius, scrCenterX, scrCenterY are defined in geomH.js and shared with S.
+// scrRadius, scrCenterX, scrCenterY are used by H & S.
 
 var geom     = 'H';          // 'H' | 'E' | 'S'
 var stack    = [];
@@ -15,6 +15,11 @@ var fill     = 0;
 var gridMode = true;
 var snapMode = false;
 var morphMode = true;
+var epsilon  = 0.0000001;
+var scrRadius  = 200;
+var scrCenterX = 400;
+var scrCenterY = 300;
+var editBoxSize = 4;
 
 // ── Vector, Matrix utilities ──────────────────────────────────────────────────────────
 
