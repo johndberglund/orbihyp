@@ -8,8 +8,8 @@
 var eOrbi, modelFD, eGenMaps, paramPtList, modelFDCent;
 var eGenMats;
 var eScale  = 150;   // pixels per unit length
-var eTransX = 0;     // screen X of world origin (set by main.js init/resize)
-var eTransY = 0;     // screen Y of world origin
+// var eTransX = 0;     // screen X of world origin (set by main.js init/resize) this is scrCenterX now.
+// var eTransY = 0;     // screen Y of world origin this is scrCenterY now.
 
 var eHomeMat      = [[1,0,0],[0,1,0],[0,0,1]]; // similarity: shapeFD → world
 var eShapeFD      = null;   // mutable working shape (copy of modelFD)
@@ -19,17 +19,17 @@ var eShapeNum  = -1;        // edit mode: index of selected stack item (-1 = non
 var eControlPt =  0;        // edit mode: which endpoint is selected (1 or 2)
 var ePosA = null, ePosB = null;  // line drawing: start/end screen coords [sx,sy]
 var _ePanStart  = null;          // pan drag: start screen pos
-var _ePanModel = null;          // pan drag: [eTransX,eTransY] at press
+var _ePanModel = null;          // pan drag: [scrCenterX,scrCenterY] at press
 var eTownMats = null;        // BFS tile matrices (canonical space)
 var eLastClickLocalPt = null; // canonical FD coords of last click (for red dot)
 
 // ── E coordinate conversion ───────────────────────────────────────────────────
 // Accepts [x,y] or [x,y,1] — only first two components used.
 function eVect2Screen(v) {
-  return [eTransX + v[0] * eScale, eTransY - v[1] * eScale];
+  return [scrCenterX + v[0] * eScale, scrCenterY - v[1] * eScale];
 }
 function eScreen2Vect(sx, sy) {
-  return [(sx - eTransX) / eScale, (eTransY - sy) / eScale, 1];
+  return [(sx - scrCenterX) / eScale, (scrCenterY - sy) / eScale, 1];
 }
 
 // ── Inverse of a similarity (orientation-preserving) matrix ──────────────────
@@ -376,10 +376,10 @@ function eBuildTownMats(canvasW, canvasH) {
   // Use 3× maxDist margin so BFS paths that detour diagonally can always
   // route through in-bounds intermediate tiles to reach canvas-edge tiles.
   var margin = maxDist * s * 3;
-  var xMin = (-eTransX)          / eScale - margin;
-  var xMax = (canvasW - eTransX) / eScale + margin;
-  var yMin = (eTransY - canvasH) / eScale - margin;
-  var yMax = eTransY             / eScale + margin;
+  var xMin = (-scrCenterX)          / eScale - margin;
+  var xMax = (canvasW - scrCenterX) / eScale + margin;
+  var yMin = (scrCenterY - canvasH) / eScale - margin;
+  var yMax = scrCenterY             / eScale + margin;
 
   // BFS
   var mats  = [ident];
@@ -567,7 +567,7 @@ function eMousePressed(sx, sy) {
   if (mode === -1) {
     // Pan: record start
     _ePanStart  = [sx, sy];
-    _ePanModel = [eTransX, eTransY];
+    _ePanModel = [scrCenterX, scrCenterY];
     return;
   }
 
@@ -606,8 +606,8 @@ function eMousePressed(sx, sy) {
 function eMouseMoved(sx, sy) {
   // ── Pan ──────────────────────────────────────────────────────────────────
   if (mode === -1 && _ePanStart !== null) {
-    eTransX = _ePanModel[0] + (sx - _ePanStart[0]);
-    eTransY = _ePanModel[1] + (sy - _ePanStart[1]);
+    scrCenterX = _ePanModel[0] + (sx - _ePanStart[0]);
+    scrCenterY = _ePanModel[1] + (sy - _ePanStart[1]);
     draw();
     return;
   }

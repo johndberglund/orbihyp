@@ -155,14 +155,14 @@ function init() {
   c.height = window.innerHeight - navH - 6; // 6 = 2×3px border
   c.width  = window.innerWidth  - ctrlW - 6;
 
-  // Shared display centre (used by H Poincaré disk and S sphere projection)
+  // Shared display centre (used by H (hyperboloid) and S (sphere) projections)
   scrCenterX = Math.round(c.width  / 2);
   scrCenterY = Math.round(c.height / 2);
   scrRadius  = Math.round(Math.min(c.width, c.height) * 0.42);
 
   // Centre E native origin
-  eTransX = Math.round(c.width  / 2);
-  eTransY = Math.round(c.height / 2);
+  //eTransX = Math.round(c.width  / 2); this is scrCenterX now.
+  //eTransY = Math.round(c.height / 2); this is scrCenterY now.
 
   // Initial rebuild
   reDo();
@@ -304,22 +304,23 @@ function selectVarS(sIdx) {
 
 function orbi2String(handle, crosscap, cone, kali) {
   var s = "";
+  for (var i=0; i<handle; i++)   s += "o";
   for (var i=0; i<cone.length; i++) s += cone[i];
   for (var i=0; i<kali.length; i++) {
     s += "*";
     for (var j=0; j<kali[i].length; j++) s += kali[i][j];
   }
   for (var i=0; i<crosscap; i++) s += "\u00d7"; // ×
-  for (var i=0; i<handle; i++)   s += "o";
   return s || "?";
 }
 
-function setZoom() {
-  var z = Number(document.getElementById("zoom").value);
-  hZoom = z;
-  document.getElementById("zoomVal").textContent = hZoom.toFixed(2);
-  draw();
-}
+// if we really used this, it would probably be in geomH.
+//function setZoom() {
+//  var z = Number(document.getElementById("zoom").value);
+//  hZoom = z;
+//  document.getElementById("zoomVal").textContent = hZoom.toFixed(2);
+//  draw();
+//}
 
 
 // ── Common tool handlers ──────────────────────────────────────────────────────
