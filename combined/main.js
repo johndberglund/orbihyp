@@ -23,12 +23,12 @@ var editBoxSize = 4;
 
 // ── Vector, Matrix utilities ──────────────────────────────────────────────────────────
 
-function dot(a, b)      { return a[0]*b[0] + a[1]*b[1] + a[2]*b[2]; }
-function cross(a, b)    { return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]; }
-function vectSum(a, b)  { return [a[0]+b[0], a[1]+b[1], a[2]+b[2]]; }
-function vectDiff(a, b) { return [a[0]-b[0], a[1]-b[1], a[2]-b[2]]; }
+function dot(a, b)        { return a[0]*b[0] + a[1]*b[1] + a[2]*b[2]; }
+function cross(a, b)      { return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]; }
+function vectSum(a, b)    { return [a[0]+b[0], a[1]+b[1], a[2]+b[2]]; }
+function vectDiff(a, b)   { return [a[0]-b[0], a[1]-b[1], a[2]-b[2]]; }
 function scalarVect(s, V) { return [V[0]*s, V[1]*s, V[2]*s]; }
-function vectLeng(a)    { return Math.sqrt(dot(a,a)); }
+function vectLeng(a)      { return Math.sqrt(dot(a,a)); }
 
 function multMatVect(mat, vect) {
   return [
@@ -71,6 +71,7 @@ function computeChi(handle, crosscap, cone, kali) {
 
 // Canonicalise for signature matching: sort cone desc, sort each kali component
 // desc, sort kali array of arrays desc-lexicographically.
+// ERROR - we can't sort kali components. Need to fix.
 function _canonOrbi(cone, kali) {
   var c = cone.slice().sort(function(a,b){return b-a;});
   var k = kali.map(function(a){return a.slice().sort(function(x,y){return y-x;});});

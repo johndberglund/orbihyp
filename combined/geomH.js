@@ -1,6 +1,4 @@
 // geomH.js — Hyperbolic geometry for the combined orbifold app.
-// Extracted from deatonC.js.  Provides hReDo(), hDraw(ctx,c),
-// hMousePressed(sx,sy,shiftKey), hMouseMoved(sx,sy), hMouseReleased(sx,sy).
 
 // ── Constants & math helpers ──────────────────────────────────────────────────
 
@@ -22,7 +20,7 @@ var paramNum = -1, paramEnd = -1;
 var paramDragFixed, paramDragLine, paramDragFixedScene, paramDragFlip;
 var paramDragLineView, paramDragAnchorView, paramDragTangentView, paramDragLenPQ, paramDragT0;
 
-// ── H structural state ────────────────────────────────────────────────────────
+// ── H structural state (also has geometry variables. need to separate.) ──────────────────
 
 var atomList = [], firstInnerMatch;
 var stepEdges, match, glueMatch, borderFD, genMaps;

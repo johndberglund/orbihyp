@@ -517,13 +517,12 @@ function eDraw(ctx, c) {
     });
 
     // ── Stack control-point boxes ─────────────────────────────────────────
-    var r = 4;
     for (var si = 0; si < stack.length; si++) {
       for (var cp = 1; cp <= 2; cp++) {
         var p  = stack[si][cp];
         var sc = eVect2Screen(multMatVect(eHomeMat, [p[0], p[1], 1]));
         ctx.beginPath();
-        ctx.rect(sc[0]-r, sc[1]-r, r*2, r*2);
+        ctx.rect(sc[0]-editBoxSize, sc[1]-editBoxSize, editBoxSize*2, editBoxSize*2);
         ctx.fillStyle = (si === eShapeNum && cp === eControlPt) ? 'yellow' : 'white';
         ctx.fill();
         ctx.strokeStyle = 'black';
@@ -586,13 +585,12 @@ function eMousePressed(sx, sy) {
   if (mode === 0) {
     // Hit-test stack control-point boxes
     eShapeNum = -1; eControlPt = 0;
-    var r = 4;
     var found = false;
     for (var i = 0; i < stack.length && !found; i++) {
       for (var cp = 1; cp <= 2; cp++) {
         var p  = stack[i][cp];
         var sc = eVect2Screen(multMatVect(eHomeMat, [p[0], p[1], 1]));
-        if (Math.abs(sx - sc[0]) < r && Math.abs(sy - sc[1]) < r) {
+        if (Math.abs(sx - sc[0]) < editBoxSize && Math.abs(sy - sc[1]) < editBoxSize) {
           eShapeNum = i; eControlPt = cp; found = true; break;
         }
       }

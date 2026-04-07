@@ -10,7 +10,6 @@ var sOrbi      = 0;    // group index 0–13 (maps to orbiSph's 1–14)
 var sMyRot     = 5;
 var sSymVects  = [[0,1,0],[1,0,0],[0,1.6180339887498948482045868343656,1]];
 var sNumMaps   = 24;
-// scrRadius, scrCenterX, scrCenterY are shared with geomH.js (defined there).
 var sPosA3d = [], sPosB3d = [];
 var sOpaque = false;
 var sBackupStack = [], sBackupSymVects = [];
@@ -647,12 +646,11 @@ function sDraw(ctx, c) {
 
   // Edit-mode control point markers (drawn on top of everything)
   if (mode === 0) {
-    var r = boxSize;
     for (var si = 0; si < stack.length; si++) {
       for (var cp = 1; cp <= 2; cp++) {
         var sc = sVect2screen(stack[si][cp]);
         ctx.beginPath();
-        ctx.rect(sc[0]-r, sc[1]-r, r*2, r*2);
+        ctx.rect(sc[0]-editBoxSize, sc[1]-editBoxSize, editBoxSize*2, editBoxSize*2);
         ctx.fillStyle = (si === sEditShapeIdx && cp === sEditPtIdx) ? 'yellow' : 'white';
         ctx.fill();
         ctx.strokeStyle = 'black';
@@ -681,7 +679,6 @@ var sPanPosA = null;
 var sBackupClickLocalPt = null; // saved before pan drag for red dot
 var sLastClickLocalPt = null;   // canonical FD coords of last click (for red dot)
 var sEditShapeIdx = -1, sEditPtIdx = -1;
-var boxSize = 4;
 
 // Groups with pure reflection lines (indexed by sOrbi 0-13)
 var sHasRefl = [true,false,true,false,true,true,false,true,true,false,true,false,true,false];
@@ -809,8 +806,8 @@ function sMousePressed(sx, sy, shiftKey) {
     for (var i = 0; i < stack.length; i++) {
       var sp = sVect2screen(stack[i][1]);
       var sq = sVect2screen(stack[i][2]);
-      if (Math.abs(sx-sp[0]) < boxSize && Math.abs(sy-sp[1]) < boxSize) { sEditShapeIdx = i; sEditPtIdx = 1; break; }
-      if (Math.abs(sx-sq[0]) < boxSize && Math.abs(sy-sq[1]) < boxSize) { sEditShapeIdx = i; sEditPtIdx = 2; break; }
+      if (Math.abs(sx-sp[0]) < editBoxSize && Math.abs(sy-sp[1]) < editBoxSize) { sEditShapeIdx = i; sEditPtIdx = 1; break; }
+      if (Math.abs(sx-sq[0]) < editBoxSize && Math.abs(sy-sq[1]) < editBoxSize) { sEditShapeIdx = i; sEditPtIdx = 2; break; }
     }
     draw();
     return;
